@@ -1,0 +1,860 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/v1/documents": {
+      "post": {
+        "description": "Validates the payload against the template's schema and queues an async render. Returns 202 with the document id and status; poll GET /v1/documents/:id until status is 'done'.",
+        "operationId": "RendersController_create",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Optional. A unique token you generate per document (for example a UUID) so a retried request returns the original document instead of creating a duplicate. This is not authentication. Equivalent to the `idempotencyKey` body field; if both are sent, this header wins.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRenderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Generate a document",
+        "tags": [
+          "documents"
+        ]
+      },
+      "get": {
+        "description": "Cursor-paginated history of documents this account generated, newest first. Optional filters: status, templateId. Use the returned nextCursor to page.",
+        "operationId": "RendersController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List documents",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/{id}": {
+      "get": {
+        "description": "Poll a document. When status is 'done' the response includes a `download` block (a short-lived URL, or the password-gated content endpoint if the document is download-protected) plus `appliedOptions` (the per-render options it was created with).",
+        "operationId": "RendersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/{id}/regenerate": {
+      "post": {
+        "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything — it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",
+        "operationId": "RendersController_regenerate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Regenerate a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/{id}/content": {
+      "get": {
+        "description": "Stream a download-protected document's PDF. Supply the download password via the `X-Document-Password` header or HTTP Basic auth (any username). No API key is used. Returns 401 if the password is missing/wrong, 404 if the document isn't protected or isn't ready, 429 if too many attempts. All responses are `Cache-Control: private, no-store`.",
+        "operationId": "DocumentContentController_content",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Download a protected document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/usage": {
+      "get": {
+        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page — a 10-page PDF counts as 10; failed renders aren't counted.",
+        "operationId": "UsageController_usage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Account usage",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
+    "/v1/templates": {
+      "get": {
+        "description": "All templates owned by the key's account (id, name, description, current published version, updatedAt), newest-updated first. `currentVersion` is 0 for a template that has never been published and so cannot be rendered yet. Authoring happens in the portal, not via the API.",
+        "operationId": "TemplatesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List templates",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/v1/templates/{id}/versions": {
+      "get": {
+        "description": "Published version history of a template (newest first). Pin any of these via the `version` field on POST /v1/documents so a future edit can never alter a live integration.",
+        "operationId": "TemplatesController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List template versions",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/v1/templates/{id}": {
+      "get": {
+        "description": "A template's metadata: name, description, current published version, the associated schema + pinned schema version, and authoring mode. The key's account must own it (else 403); unknown id returns 404.",
+        "operationId": "TemplatesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a template",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/v1/schemas": {
+      "get": {
+        "description": "All payload schemas owned by the key's account (id, name, description, updatedAt). A schema may be reused by many templates and have many test datasets.",
+        "operationId": "SchemasController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List schemas",
+        "tags": [
+          "schemas"
+        ]
+      }
+    },
+    "/v1/schemas/{id}/versions": {
+      "get": {
+        "description": "Published version history of a schema (newest first). Pin any of these via the `schemaVersion` field on POST /v1/documents.",
+        "operationId": "SchemasController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List schema versions",
+        "tags": [
+          "schemas"
+        ]
+      }
+    },
+    "/v1/schemas/{id}": {
+      "get": {
+        "description": "Returns the schema's name, description, and its PUBLISHED JSON Schema + sample for the latest published version (or `?version=N`). 409 if the schema has no published version yet. The key's account must own it (else 403).",
+        "operationId": "SchemasController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a schema",
+        "tags": [
+          "schemas"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "PageWeaver API",
+    "description": "Generate PDFs from versioned templates and typed JSON payloads.\n\n### Authentication\nEvery request must include your secret API key in the `x-api-key` header (`pk_live_...` in production, `pk_test_...` in development). This is the only credential the API needs. Create and roll keys in the portal.\n\n### Idempotency\n`POST /v1/documents` optionally accepts an `Idempotency-Key` header (or an `idempotencyKey` body field): a unique token you generate per document so that a retried request after a network error returns the original document instead of creating a duplicate. It is optional, and it is not authentication. If you send both, the header takes precedence.\n\n### How rendering works\nCreating a document is asynchronous. You receive `202` with a document id, then either poll `GET /v1/documents/:id` until the status is `done` or receive a webhook. The finished PDF is served from a short-lived download URL.\n\n### Templates or inline HTML\nSend a `templateId` to render a published template, or send inline `html` (plus optional `css`) to convert raw HTML directly. No external images, stylesheets, or JavaScript are allowed in inline HTML. Every document property (page, metadata, header/footer, watermark, localization, security) is overridable per request under the single `options` key.\n\n### Download protection\nSet `options.security.download` to require a password to download a document, separate from the PDF's own open-password. Protected documents are fetched from `GET /v1/documents/:id/content` with the `X-Document-Password` header (not the API key).\n\n### Regenerate\n`POST /v1/documents/:id/regenerate` faithfully replays a document exactly as it was (same version/inline source, payload, options). It accepts no body and cannot change the output.",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "documents",
+      "description": "Create PDF documents from a template and a typed payload, then poll or receive a webhook for the result. This is the core endpoint."
+    },
+    {
+      "name": "templates",
+      "description": "Discover your published templates and their pinnable versions. Read only. Author templates in the portal."
+    },
+    {
+      "name": "schemas",
+      "description": "Discover the JSON Schemas your payloads are validated against, and their published versions. Read only."
+    },
+    {
+      "name": "usage",
+      "description": "Check page consumption against your plan quota for the current period."
+    }
+  ],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    },
+    "schemas": {
+      "OptionsPageDto": {
+        "type": "object",
+        "properties": {
+          "size": {
+            "type": "string",
+            "enum": [
+              "A4",
+              "A5",
+              "A6",
+              "A3",
+              "A2",
+              "A1",
+              "A0",
+              "Letter",
+              "Legal",
+              "Tabloid",
+              "Ledger"
+            ],
+            "description": "Standard paper size, e.g. 'A4' or 'Letter'."
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "portrait",
+              "landscape"
+            ],
+            "description": "Page orientation (needs `size`)."
+          },
+          "margin": {
+            "type": "string",
+            "example": "18mm",
+            "description": "CSS margin shorthand (1-4 lengths)."
+          },
+          "scale": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 2,
+            "description": "Render scale (0.1-2.0)."
+          }
+        }
+      },
+      "OptionsRenderingDto": {
+        "type": "object",
+        "properties": {
+          "media": {
+            "type": "string",
+            "enum": [
+              "screen",
+              "print"
+            ],
+            "description": "CSS media type Chromium emulates."
+          },
+          "printBackground": {
+            "type": "boolean",
+            "description": "Print background graphics/colours."
+          },
+          "omitBackground": {
+            "type": "boolean",
+            "description": "Transparent background (implies printBackground)."
+          },
+          "singlePage": {
+            "type": "boolean",
+            "description": "Collapse the whole document onto one tall page."
+          },
+          "preferCssPageSize": {
+            "type": "boolean",
+            "description": "Honour the document's CSS @page size over API paper params."
+          },
+          "pageRanges": {
+            "type": "string",
+            "example": "1-3,5",
+            "description": "Pages to print. Empty = all."
+          }
+        }
+      },
+      "OptionsMetadataDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "PDF Title (also the header/footer {{title}}). Liquid tokens resolve."
+          },
+          "author": {
+            "type": "string",
+            "description": "PDF Author."
+          },
+          "subject": {
+            "type": "string",
+            "description": "PDF Subject."
+          },
+          "keywords": {
+            "type": "string",
+            "description": "PDF Keywords."
+          },
+          "creator": {
+            "type": "string",
+            "description": "PDF Creator."
+          }
+        }
+      },
+      "OptionsBandDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Show the band. Omitted + any slot text present auto-enables it."
+          },
+          "left": {
+            "type": "string",
+            "description": "Left slot (literal text + {{field}} / {{@page}} tokens)."
+          },
+          "center": {
+            "type": "string",
+            "example": "Page {{@page}} of {{@pages}}",
+            "description": "Center slot."
+          },
+          "right": {
+            "type": "string",
+            "description": "Right slot."
+          },
+          "fontSizePt": {
+            "type": "number",
+            "description": "Band font size in points."
+          },
+          "color": {
+            "type": "string",
+            "example": "#666666",
+            "description": "Band text colour (hex or CSS name)."
+          }
+        }
+      },
+      "OptionsWatermarkDto": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "example": "DRAFT {{invoiceNumber}}",
+            "description": "Watermark text (empty = off). Tokens resolve."
+          },
+          "pages": {
+            "type": "string",
+            "example": "1-3",
+            "description": "Pages to mark. Empty = all."
+          },
+          "fontSizePt": {
+            "type": "number",
+            "description": "Font size in points."
+          },
+          "color": {
+            "type": "string",
+            "example": "#cccccc",
+            "description": "Colour (hex or CSS name)."
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Opacity 0-1."
+          },
+          "rotation": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 360,
+            "description": "Rotation in degrees."
+          }
+        }
+      },
+      "OptionsStructureDto": {
+        "type": "object",
+        "properties": {
+          "outline": {
+            "type": "boolean",
+            "description": "Emit PDF bookmarks/outline from the document headings."
+          },
+          "taggedPdf": {
+            "type": "boolean",
+            "description": "Emit a tagged (accessible) PDF structure."
+          }
+        }
+      },
+      "RenderLocalizationDto": {
+        "type": "object",
+        "properties": {
+          "locale": {
+            "type": "string",
+            "example": "de-DE",
+            "description": "BCP-47 locale for date/number/currency formatting."
+          },
+          "timeZone": {
+            "type": "string",
+            "example": "Europe/Berlin",
+            "description": "IANA time zone."
+          },
+          "currency": {
+            "type": "string",
+            "example": "EUR",
+            "description": "ISO 4217 default currency."
+          }
+        }
+      },
+      "OptionsPdfPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "printing": {
+            "type": "boolean"
+          },
+          "copying": {
+            "type": "boolean"
+          },
+          "modifying": {
+            "type": "boolean"
+          },
+          "annotating": {
+            "type": "boolean"
+          },
+          "fillingForms": {
+            "type": "boolean"
+          },
+          "assembling": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OptionsPdfSecurityDto": {
+        "type": "object",
+        "properties": {
+          "userPassword": {
+            "type": "string",
+            "description": "Password required to open the PDF (PDF encryption)."
+          },
+          "ownerPassword": {
+            "type": "string",
+            "description": "Owner password for full permissions."
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/OptionsPdfPermissionsDto"
+          }
+        }
+      },
+      "OptionsDownloadSecurityDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable a download password that gates streaming the PDF from our CDN."
+          },
+          "password": {
+            "type": "string",
+            "description": "The download password recipients must supply to fetch the PDF."
+          },
+          "generate": {
+            "type": "boolean",
+            "description": "Generate a strong random download password (returned in the response)."
+          }
+        }
+      },
+      "OptionsSecurityDto": {
+        "type": "object",
+        "properties": {
+          "pdf": {
+            "description": "The PDF's own open-password + permissions.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsPdfSecurityDto"
+              }
+            ]
+          },
+          "download": {
+            "description": "Download protection: a separate password that gates streaming this document from our endpoint, distinct from the PDF's own open-password. Overrides the template default per request.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsDownloadSecurityDto"
+              }
+            ]
+          }
+        }
+      },
+      "RenderOptionsDto": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "description": "Page size / orientation / margin / scale.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsPageDto"
+              }
+            ]
+          },
+          "rendering": {
+            "description": "Media type, backgrounds, page ranges, single page.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsRenderingDto"
+              }
+            ]
+          },
+          "metadata": {
+            "description": "PDF metadata (title/author/subject/keywords/creator).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsMetadataDto"
+              }
+            ]
+          },
+          "header": {
+            "description": "Running header band.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsBandDto"
+              }
+            ]
+          },
+          "footer": {
+            "description": "Running footer band.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsBandDto"
+              }
+            ]
+          },
+          "watermark": {
+            "description": "Text watermark.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsWatermarkDto"
+              }
+            ]
+          },
+          "structure": {
+            "description": "PDF outline + tagged/accessible structure.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsStructureDto"
+              }
+            ]
+          },
+          "localization": {
+            "description": "Per-render locale / time zone / currency.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RenderLocalizationDto"
+              }
+            ]
+          },
+          "security": {
+            "description": "PDF open-password + permissions.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsSecurityDto"
+              }
+            ]
+          }
+        }
+      },
+      "CreateRenderDto": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "example": "sample-invoice",
+            "description": "Template id (or the built-in 'sample-invoice'). Provide EITHER templateId OR inline `html` (exactly one). Omit for an inline render."
+          },
+          "html": {
+            "type": "string",
+            "description": "Inline render: raw HTML to convert directly, with no template. Mutually exclusive with templateId. No external images, stylesheets, or JavaScript are allowed (rejected with a 400). May use Liquid tokens + `payload`; account image assets are referenced by name.",
+            "example": "<h1>Hello {{ name }}</h1>"
+          },
+          "css": {
+            "type": "string",
+            "description": "Inline render only: CSS applied to the inline `html` (injected as a <style>). Requires `html`.",
+            "example": "h1 { color: #4f46e5 }"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Data merged via Liquid. For a template render it is validated against the template's JSON Schema (required). For an inline render it is optional and merged as-is (no schema)."
+          },
+          "version": {
+            "type": "number",
+            "description": "Pin a published TEMPLATE version; defaults to the template's latest.",
+            "minimum": 1
+          },
+          "schemaId": {
+            "type": "string",
+            "description": "Validate the payload against THIS schema instead of the one the template pins. Omit to use the template's pinned schema. The key's account must own the schema.",
+            "example": "cmxyz123schema"
+          },
+          "schemaVersion": {
+            "type": "number",
+            "description": "Pin a published SCHEMA version (requires schemaId); defaults to that schema's latest published version.",
+            "minimum": 1
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Optional idempotency token you generate per document, so repeating a request returns the same document instead of creating a duplicate. This is not authentication. Prefer the `Idempotency-Key` header; this body field is a fallback for clients that cannot set headers. If both are sent, the header wins."
+          },
+          "callbackUrl": {
+            "type": "string",
+            "description": "HTTPS URL to receive a signed POST when this render reaches a terminal state (done/failed). Overrides the account-default webhook for this render only. Polling still works regardless.",
+            "example": "https://example.com/pageweaver/webhook"
+          },
+          "options": {
+            "description": "Per-render document properties, layered on the version's frozen settings for this render only. Nest every override under this one key (page / rendering / metadata / header / footer / watermark / structure / localization / security). Unknown keys are rejected (400).",
+            "example": {
+              "page": {
+                "size": "A4",
+                "orientation": "portrait",
+                "margin": "18mm"
+              },
+              "rendering": {
+                "media": "screen",
+                "printBackground": true
+              },
+              "metadata": {
+                "title": "Invoice #1042",
+                "author": "Acme Inc."
+              },
+              "footer": {
+                "center": "Page {{@page}} of {{@pages}}"
+              },
+              "watermark": {
+                "text": "DRAFT",
+                "opacity": 0.3
+              },
+              "localization": {
+                "locale": "de-DE",
+                "timeZone": "Europe/Berlin",
+                "currency": "EUR"
+              },
+              "security": {
+                "pdf": {
+                  "userPassword": "s3cret",
+                  "permissions": {
+                    "copying": false
+                  }
+                },
+                "download": {
+                  "enabled": true,
+                  "generate": true
+                }
+              }
+            },
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RenderOptionsDto"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
