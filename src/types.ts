@@ -205,6 +205,18 @@ export interface CreateDocumentResult {
   download?: DownloadInfo;
 }
 
+/**
+ * A document's integrity fingerprint, present once it has finished rendering. Re-hash your copy of
+ * the PDF with `hashAlg` (SHA-256) and compare to `contentHash` to prove it is unaltered.
+ */
+export interface DocumentIntegrity {
+  /** Lowercase hex SHA-256 of the issued PDF bytes. */
+  contentHash: string;
+  hashAlg: string;
+  /** 1-based position in your account's append-only hash chain. */
+  chainSeq: number | null;
+}
+
 /** The `GET /v1/documents/:id` body. */
 export interface Document {
   id: string;
@@ -215,6 +227,27 @@ export interface Document {
   error?: string;
   /** The per-render options the document was created with; null if none. */
   appliedOptions?: Record<string, unknown> | null;
+  /** Content fingerprint + chain position; null until the document has finished rendering. */
+  integrity?: DocumentIntegrity | null;
+}
+
+/** The `GET /v1/documents/:id/verify` body: tamper-evidence + hash-chain attestation. */
+export interface DocumentVerification {
+  documentId: string;
+  status: DocumentStatus;
+  /** SHA-256 of the issued PDF, or null if not rendered yet. */
+  contentHash: string | null;
+  hashAlg: string | null;
+  chainSeq: number | null;
+  /**
+   * Whether this document's chain link recomputes correctly from its predecessor. False if a row was
+   * altered or re-ordered; null when the document isn't chained yet.
+   */
+  chainVerified: boolean | null;
+  /** ISO 8601 timestamp the document was issued. */
+  issuedAt: string | null;
+  /** Digital-signature status. Always null today; reserved for PAdES signing. */
+  signature: null;
 }
 
 /** One row in the document history list. */

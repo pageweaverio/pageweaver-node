@@ -124,6 +124,36 @@
         ]
       }
     },
+    "/v1/documents/{id}/verify": {
+      "get": {
+        "description": "Return a document's integrity proof: the SHA-256 `contentHash` of the issued PDF, its position in your account's append-only hash chain, and `chainVerified` (whether the chain link recomputes correctly from its predecessor). To check a file you hold, re-hash its bytes with SHA-256 and compare to `contentHash` — no API call is required for that. `signature` is reserved for digital signing and is currently null.",
+        "operationId": "RendersController_verify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Verify a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/{id}/regenerate": {
       "post": {
         "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything — it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",

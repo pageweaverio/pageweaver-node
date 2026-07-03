@@ -133,6 +133,31 @@ test("documents.list serializes query params", async () => {
   assert.equal(call.url, "http://api.test/v1/documents?status=done&templateId=t&limit=5");
 });
 
+test("documents.verify calls the verify endpoint with auth", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      documentId: "doc_9",
+      status: "done",
+      contentHash: "abc123",
+      hashAlg: "sha256",
+      chainSeq: 4,
+      chainVerified: true,
+      issuedAt: "2026-07-03T00:00:00.000Z",
+      signature: null,
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const result = await pw.documents.verify("doc_9");
+
+  assert.equal(result.contentHash, "abc123");
+  assert.equal(result.chainVerified, true);
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.url, "http://api.test/v1/documents/doc_9/verify");
+  assert.equal(call.headers["x-api-key"], "pk_test_abc");
+});
+
 test("documents.download with a password hits the content endpoint without the API key", async () => {
   const pdf = new Uint8Array([37, 80, 68, 70]); // %PDF
   const { fetch, calls } = mockFetch([new Response(pdf, { status: 200 })]);

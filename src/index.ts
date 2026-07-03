@@ -56,6 +56,8 @@ export type {
   CreateDocumentResult,
   DownloadInfo,
   Document,
+  DocumentIntegrity,
+  DocumentVerification,
   DocumentListItem,
   ListDocumentsParams,
   DocumentPage,

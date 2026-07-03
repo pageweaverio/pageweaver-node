@@ -5,6 +5,7 @@ import type {
   CreateDocumentResult,
   Document,
   DocumentPage,
+  DocumentVerification,
   ListDocumentsParams,
 } from "./types";
 
@@ -54,6 +55,19 @@ export class DocumentsResource {
   /** Fetch the current state of a document. When `status` is "done" it carries a `download` block. */
   get(id: string, signal?: AbortSignal): Promise<Document> {
     return this.http.json<Document>("GET", `/v1/documents/${encodeURIComponent(id)}`, { signal });
+  }
+
+  /**
+   * Fetch a document's integrity proof: the SHA-256 `contentHash`, its hash-chain position, and
+   * `chainVerified`. To check a file you already hold, re-hash its bytes and compare to `contentHash`
+   * yourself — no API call is required for that.
+   */
+  verify(id: string, signal?: AbortSignal): Promise<DocumentVerification> {
+    return this.http.json<DocumentVerification>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/verify`,
+      { signal },
+    );
   }
 
   /** One page of the document history, newest first. Use `nextCursor` to page. */
