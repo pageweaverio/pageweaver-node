@@ -64,6 +64,93 @@ test("documents.create posts with auth + idempotency header and strips it from t
   assert.deepEqual(call.body, { templateId: "tmpl_invoice", payload: { total: 42 }, version: 3 });
 });
 
+test("documents.createSync defaults to JSON with the download url (no Accept: application/pdf)", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      id: "doc_sync",
+      status: "done",
+      version: 2,
+      download: { protected: false, requiresPassword: false, url: "http://cdn.test/doc_sync.pdf" },
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const out = await pw.documents.createSync({ templateId: "t", payload: { a: 1 } });
+
+  assert.equal(out.kind, "document");
+  if (out.kind === "document") {
+    assert.equal(out.document.status, "done");
+    assert.equal(out.document.download?.url, "http://cdn.test/doc_sync.pdf");
+  }
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.method, "POST");
+  assert.equal(call.headers["prefer"], "wait");
+  // The default does NOT request raw bytes — it wants the JSON document with the url.
+  assert.notEqual(call.headers["accept"], "application/pdf");
+});
+
+test("documents.createSync streams raw PDF bytes with { pdf: true } (Accept: application/pdf)", async () => {
+  const pdf = new Uint8Array([37, 80, 68, 70, 45]); // %PDF-
+  const { fetch, calls } = mockFetch([
+    new Response(pdf, {
+      status: 200,
+      headers: {
+        "content-type": "application/pdf",
+        "x-document-id": "doc_sync",
+        "x-document-version": "2",
+      },
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const out = await pw.documents.createSync({ templateId: "t", payload: { a: 1 } }, { pdf: true });
+
+  assert.equal(out.kind, "pdf");
+  if (out.kind === "pdf") {
+    assert.deepEqual(out.pdf, pdf);
+    assert.equal(out.id, "doc_sync");
+    assert.equal(out.version, 2);
+  }
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.headers["prefer"], "wait");
+  assert.equal(call.headers["accept"], "application/pdf");
+});
+
+test("documents.createSync falls back to a pending result when the wait deadline is exceeded", async () => {
+  const { fetch } = mockFetch([json(202, { id: "doc_slow", status: "rendering", version: 1 })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const out = await pw.documents.createSync({ templateId: "t", payload: {} });
+
+  assert.equal(out.kind, "pending");
+  if (out.kind === "pending") {
+    assert.equal(out.id, "doc_slow");
+    assert.equal(out.status, "rendering");
+  }
+});
+
+test("documents.createSync returns JSON (never bytes) for a protected document even with { pdf: true }", async () => {
+  const { fetch } = mockFetch([
+    json(200, {
+      id: "doc_prot",
+      status: "done",
+      version: 1,
+      download: { protected: true, requiresPassword: true, url: "http://api.test/v1/documents/doc_prot/content" },
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const out = await pw.documents.createSync({ templateId: "t", payload: {} }, { pdf: true });
+
+  assert.equal(out.kind, "document");
+  if (out.kind === "document") {
+    assert.equal(out.document.status, "done");
+    assert.equal(out.document.download?.protected, true);
+  }
+});
+
 test("documents.waitFor polls until the document is done", async () => {
   const { fetch, calls } = mockFetch([
     json(202, { id: "doc_2", status: "queued", version: 1 }),

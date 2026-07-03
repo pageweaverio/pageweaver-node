@@ -3,8 +3,10 @@ import { PageWeaverDocumentFailedError, PageWeaverTimeoutError } from "./errors"
 import type {
   CreateDocumentParams,
   CreateDocumentResult,
+  CreateSyncResult,
   Document,
   DocumentPage,
+  DocumentStatus,
   DocumentVerification,
   ListDocumentsParams,
 } from "./types";
@@ -30,6 +32,16 @@ export interface WaitOptions {
 export interface DownloadOptions {
   /** The download password, for a download-protected document. */
   password?: string;
+  signal?: AbortSignal;
+}
+
+export interface CreateSyncOptions {
+  /**
+   * Stream raw PDF bytes for an unprotected document (`Accept: application/pdf`). Default **false**:
+   * receive the finished document as JSON with a signed `download.url`. Set true to get the bytes
+   * directly (e.g. to write a file). Protected/failed documents always come back as JSON regardless.
+   */
+  pdf?: boolean;
   signal?: AbortSignal;
 }
 
@@ -151,6 +163,60 @@ export class DocumentsResource {
   }
 
   /**
+   * Create a document synchronously: send `Prefer: wait` so the server holds the response open until
+   * the render finishes, within its plan-bounded deadline. Returns a {@link CreateSyncResult} whose
+   * `kind` distinguishes a finished document as JSON (`document`, with a signed `download.url`), the
+   * raw PDF bytes (`pdf`), or a deadline fallback (`pending`) whose id you then poll. One HTTP call, no
+   * client-side polling.
+   *
+   * By default you get the finished document as JSON with the download url. Pass `{ pdf: true }` to
+   * stream the raw PDF bytes instead (protected/failed documents always come back as JSON).
+   *
+   * ```ts
+   * // Default: JSON with the signed download url.
+   * const out = await pw.documents.createSync({ templateId: "tmpl_invoice", payload });
+   * if (out.kind === "document") console.log(out.document.download?.url);
+   * else if (out.kind === "pending") await pw.documents.waitFor(out.id); // deadline elapsed
+   *
+   * // Opt in to raw bytes:
+   * const res = await pw.documents.createSync({ templateId: "tmpl_invoice", payload }, { pdf: true });
+   * if (res.kind === "pdf") fs.writeFileSync("invoice.pdf", res.pdf);
+   * ```
+   */
+  async createSync(
+    params: CreateDocumentParams,
+    opts: CreateSyncOptions = {},
+  ): Promise<CreateSyncResult> {
+    const wantPdf = opts.pdf ?? false;
+    const { idempotencyKey, ...rest } = params;
+    const headers: Record<string, string> = { prefer: "wait" };
+    if (idempotencyKey) headers["idempotency-key"] = idempotencyKey;
+    if (wantPdf) headers["accept"] = "application/pdf";
+
+    const res = await this.http.request("POST", "/v1/documents", {
+      body: rest,
+      headers,
+      signal: opts.signal,
+    });
+
+    // Content-negotiated: raw PDF bytes, or JSON (a finished document, or the 202 fallback).
+    if (/application\/pdf/i.test(res.headers.get("content-type") ?? "")) {
+      return {
+        kind: "pdf",
+        id: res.headers.get("x-document-id"),
+        version: numberOrNull(res.headers.get("x-document-version")),
+        pdf: new Uint8Array(await res.arrayBuffer()),
+      };
+    }
+    const text = await res.text();
+    const body = (text ? JSON.parse(text) : {}) as Document & { status: DocumentStatus };
+    if (res.status === 202) {
+      return { kind: "pending", id: body.id, version: body.version ?? null, status: body.status };
+    }
+    return { kind: "document", document: body };
+  }
+
+  /**
    * Download the finished PDF bytes. For a download-protected document, pass `{ password }`. For an
    * unprotected document, the short-lived signed URL is resolved and fetched automatically.
    */
@@ -174,6 +240,13 @@ export class DocumentsResource {
     }
     return this.http.fetchUrlBytes(doc.download.url, opts.signal);
   }
+}
+
+/** Parse a numeric response-header value, or null when it is absent/non-numeric. */
+function numberOrNull(value: string | null): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Delay `ms`, rejecting early if the signal aborts. */

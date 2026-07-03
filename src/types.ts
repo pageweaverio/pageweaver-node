@@ -206,6 +206,19 @@ export interface CreateDocumentResult {
 }
 
 /**
+ * The outcome of a synchronous ({@link DocumentsResource.createSync}) create. Discriminated on `kind`:
+ *   - `pdf`      — an unprotected document finished within the deadline and its bytes were streamed.
+ *   - `document` — a finished document as JSON: a download-protected or failed document, or when raw
+ *                  bytes were not requested. Inspect `document.status`.
+ *   - `pending`  — the wait deadline elapsed first; the render continues. Poll `id` (or await a
+ *                  webhook) to get the result.
+ */
+export type CreateSyncResult =
+  | { kind: "pdf"; id: string | null; version: number | null; pdf: Uint8Array }
+  | { kind: "document"; document: Document }
+  | { kind: "pending"; id: string; version: number | null; status: DocumentStatus };
+
+/**
  * A document's integrity fingerprint, present once it has finished rendering. Re-hash your copy of
  * the PDF with `hashAlg` (SHA-256) and compare to `contentHash` to prove it is unaltered.
  */

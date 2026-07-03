@@ -66,6 +66,15 @@ export class HttpClient {
     return new Uint8Array(buf);
   }
 
+  /**
+   * Perform a request and return the raw {@link Response} (2xx only; non-2xx still throws a
+   * {@link PageWeaverApiError}). For content-negotiated endpoints where the body may be JSON or bytes
+   * depending on the response — e.g. synchronous create, which returns PDF, a document, or a 202.
+   */
+  request(method: string, path: string, init: RequestInitLite = {}): Promise<Response> {
+    return this.send(method, path, init);
+  }
+
   /** Fetch an absolute URL (e.g. a signed download URL) and return its bytes. */
   async fetchUrlBytes(url: string, signal?: AbortSignal): Promise<Uint8Array> {
     const { controller, done } = this.withTimeout(signal);

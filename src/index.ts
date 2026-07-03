@@ -4,7 +4,12 @@
 export { PageWeaver, type PageWeaverOptions } from "./client";
 export type { FetchLike } from "./http";
 
-export { DocumentsResource, type WaitOptions, type DownloadOptions } from "./documents";
+export {
+  DocumentsResource,
+  type WaitOptions,
+  type DownloadOptions,
+  type CreateSyncOptions,
+} from "./documents";
 export { TemplatesResource } from "./templates";
 export { SchemasResource } from "./schemas";
 export { UsageResource } from "./usage";
@@ -54,6 +59,7 @@ export type {
   CreateFromTemplateParams,
   CreateFromInlineParams,
   CreateDocumentResult,
+  CreateSyncResult,
   DownloadInfo,
   Document,
   DocumentIntegrity,
