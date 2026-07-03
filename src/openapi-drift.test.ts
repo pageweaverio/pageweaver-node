@@ -83,9 +83,10 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   OptionsWatermarkDto: ["text", "pages", "fontSizePt", "color", "opacity", "rotation"],
   OptionsStructureDto: ["outline", "taggedPdf"],
   RenderLocalizationDto: ["locale", "timeZone", "currency"],
-  OptionsSecurityDto: ["pdf", "download"],
+  OptionsSecurityDto: ["pdf", "signature", "download"],
   OptionsPdfSecurityDto: ["userPassword", "ownerPassword", "permissions"],
   OptionsPdfPermissionsDto: ["printing", "copying", "modifying", "annotating", "fillingForms", "assembling"],
+  OptionsSignatureDto: ["enabled", "reason", "location", "contactInfo", "certSource"],
   OptionsDownloadSecurityDto: ["enabled", "password", "generate"],
 };
 

@@ -119,9 +119,20 @@ export interface DownloadSecurityOptions {
   generate?: boolean;
 }
 
+/** Per-render PAdES digital-signing options under `options.security.signature`. */
+export interface SignatureOptions {
+  enabled?: boolean;
+  reason?: string;
+  location?: string;
+  contactInfo?: string;
+  /** "platform" (PageWeaver self-signed) or "byo" (your uploaded certificate, Enterprise). */
+  certSource?: "platform" | "byo";
+}
+
 export interface SecurityOptions {
   pdf?: PdfSecurityOptions;
   download?: DownloadSecurityOptions;
+  signature?: SignatureOptions;
 }
 
 /**
@@ -228,6 +239,21 @@ export interface DocumentIntegrity {
   hashAlg: string;
   /** 1-based position in your account's append-only hash chain. */
   chainSeq: number | null;
+  /** Digital-signature status; null when the document is unsigned. */
+  signature?: DocumentSignature | null;
+}
+
+/** A document's PAdES digital-signature status; null when the document is unsigned. */
+export interface DocumentSignature {
+  /** Signature algorithm label, e.g. "RSA-SHA256 / PAdES-B". */
+  algorithm: string | null;
+  /** Lowercase hex SHA-256 fingerprint of the signer certificate. */
+  signerCertFingerprint: string | null;
+  /** "platform" (PageWeaver self-signed) or "byo" (your own certificate). */
+  signerCertSource: string | null;
+  signedAt: string | null;
+  /** Whether the signer certificate chains to a public trust anchor (a "byo" cert is trusted). */
+  trusted: boolean;
 }
 
 /** The `GET /v1/documents/:id` body. */
@@ -259,8 +285,8 @@ export interface DocumentVerification {
   chainVerified: boolean | null;
   /** ISO 8601 timestamp the document was issued. */
   issuedAt: string | null;
-  /** Digital-signature status. Always null today; reserved for PAdES signing. */
-  signature: null;
+  /** Digital-signature status; null when the document is unsigned. */
+  signature: DocumentSignature | null;
 }
 
 /** One row in the document history list. */

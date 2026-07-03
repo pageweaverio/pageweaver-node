@@ -3,9 +3,25 @@
   "paths": {
     "/v1/documents": {
       "post": {
-        "description": "Validates the payload against the template's schema and queues an async render. Returns 202 with the document id and status; poll GET /v1/documents/:id until status is 'done'.",
+        "description": "Validates the payload against the template's schema and queues a render.\n\nBy default this is asynchronous: it returns 202 with the document id and status; poll GET /v1/documents/:id until status is 'done', or receive a webhook.\n\nSynchronous mode: send `Prefer: wait` (or `?wait=1`) to hold the response open until the render finishes, within a plan-bounded deadline. With `Accept: application/pdf` an unprotected document streams back as 200 application/pdf (the id is in the `X-Document-Id` header); otherwise you receive the 200 GET-shaped JSON (a `download` block for a finished document, or status + error for a failed one). If the deadline passes first, the response falls back to the async 202 and the render continues, so a later poll resolves the same id. Download-protected documents never stream inline: sync returns the JSON envelope pointing at the content endpoint.",
         "operationId": "RendersController_create",
         "parameters": [
+          {
+            "name": "wait",
+            "required": false,
+            "in": "query",
+            "description": "Set to `1` for synchronous mode (same as the `Prefer: wait` header).",
+            "schema": {}
+          },
+          {
+            "name": "Prefer",
+            "in": "header",
+            "description": "Set to `wait` for synchronous mode: the response blocks until the render is done, within a plan-bounded deadline, then falls back to the async 202. Equivalent to `?wait=1`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "Idempotency-Key",
             "in": "header",
@@ -27,8 +43,11 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Synchronous only: the finished document as JSON, or the raw PDF bytes when `Accept: application/pdf` was sent for an unprotected document."
+          },
           "202": {
-            "description": ""
+            "description": "Queued: the async default, or the synchronous deadline/fallback response."
           }
         },
         "security": [
@@ -42,7 +61,7 @@
         ]
       },
       "get": {
-        "description": "Cursor-paginated history of documents this account generated, newest first. Optional filters: status, templateId. Use the returned nextCursor to page.",
+        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, createdAfter/createdBefore (ISO date-time, bounding creation time), and delivery (the webhook-delivery state of each document: 'undelivered' for documents that were subscribed to a webhook but never delivered successfully — the set to reconcile after an endpoint outage — plus 'failed', 'delivered', 'pending', 'skipped', or 'none' for documents with no webhook). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
         "operationId": "RendersController_list",
         "parameters": [
           {
@@ -71,6 +90,38 @@
           },
           {
             "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdAfter",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "createdBefore",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "delivery",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
             "required": true,
             "in": "query",
             "schema": {
@@ -126,7 +177,7 @@
     },
     "/v1/documents/{id}/verify": {
       "get": {
-        "description": "Return a document's integrity proof: the SHA-256 `contentHash` of the issued PDF, its position in your account's append-only hash chain, and `chainVerified` (whether the chain link recomputes correctly from its predecessor). To check a file you hold, re-hash its bytes with SHA-256 and compare to `contentHash` — no API call is required for that. `signature` is reserved for digital signing and is currently null.",
+        "description": "Return a document's integrity proof: the SHA-256 `contentHash` of the issued PDF, its position in your account's append-only hash chain, and `chainVerified` (whether the chain link recomputes correctly from its predecessor). To check a file you hold, re-hash its bytes with SHA-256 and compare to `contentHash`, no API call is required for that. When the document was digitally signed, `signature` reports the algorithm, signer fingerprint, cert source, and whether the signer certificate is trusted; it is null for unsigned documents.",
         "operationId": "RendersController_verify",
         "parameters": [
           {
@@ -403,7 +454,7 @@
   },
   "info": {
     "title": "PageWeaver API",
-    "description": "Generate PDFs from versioned templates and typed JSON payloads.\n\n### Authentication\nEvery request must include your secret API key in the `x-api-key` header (`pk_live_...` in production, `pk_test_...` in development). This is the only credential the API needs. Create and roll keys in the portal.\n\n### Idempotency\n`POST /v1/documents` optionally accepts an `Idempotency-Key` header (or an `idempotencyKey` body field): a unique token you generate per document so that a retried request after a network error returns the original document instead of creating a duplicate. It is optional, and it is not authentication. If you send both, the header takes precedence.\n\n### How rendering works\nCreating a document is asynchronous. You receive `202` with a document id, then either poll `GET /v1/documents/:id` until the status is `done` or receive a webhook. The finished PDF is served from a short-lived download URL.\n\n### Templates or inline HTML\nSend a `templateId` to render a published template, or send inline `html` (plus optional `css`) to convert raw HTML directly. No external images, stylesheets, or JavaScript are allowed in inline HTML. Every document property (page, metadata, header/footer, watermark, localization, security) is overridable per request under the single `options` key.\n\n### Download protection\nSet `options.security.download` to require a password to download a document, separate from the PDF's own open-password. Protected documents are fetched from `GET /v1/documents/:id/content` with the `X-Document-Password` header (not the API key).\n\n### Regenerate\n`POST /v1/documents/:id/regenerate` faithfully replays a document exactly as it was (same version/inline source, payload, options). It accepts no body and cannot change the output.",
+    "description": "Generate PDFs from versioned templates and typed JSON payloads.\n\n### Authentication\nEvery request must include your secret API key in the `x-api-key` header (`pk_live_...` in production, `pk_test_...` in development). This is the only credential the API needs. Create and roll keys in the portal.\n\n### Idempotency\n`POST /v1/documents` optionally accepts an `Idempotency-Key` header (or an `idempotencyKey` body field): a unique token you generate per document so that a retried request after a network error returns the original document instead of creating a duplicate. It is optional, and it is not authentication. If you send both, the header takes precedence.\n\n### How rendering works\nCreating a document is asynchronous by default. You receive `202` with a document id, then either poll `GET /v1/documents/:id` until the status is `done` or receive a webhook. The finished PDF is served from a short-lived download URL.\n\n### Synchronous mode (Prefer: wait)\nFor a low-volume, latency-sensitive call you can get the result in one request: send the `Prefer: wait` header (or `?wait=1`) and the response blocks until the render finishes, within a plan-bounded deadline. With `Accept: application/pdf` an unprotected document streams back as `200 application/pdf` (its id is in the `X-Document-Id` response header); otherwise you receive the same `200` JSON that `GET /v1/documents/:id` returns. If the render takes longer than the deadline, the response falls back to the async `202` and keeps running, so a later poll of the same id still resolves. Sync is single-document only and meters identically to the async path; use async for bulk or long renders.\n\n### Templates or inline HTML\nSend a `templateId` to render a published template, or send inline `html` (plus optional `css`) to convert raw HTML directly. No external images, stylesheets, or JavaScript are allowed in inline HTML. Every document property (page, metadata, header/footer, watermark, localization, security) is overridable per request under the single `options` key.\n\n### Download protection\nSet `options.security.download` to require a password to download a document, separate from the PDF's own open-password. Protected documents are fetched from `GET /v1/documents/:id/content` with the `X-Document-Password` header (not the API key).\n\n### Regenerate\n`POST /v1/documents/:id/regenerate` faithfully replays a document exactly as it was (same version/inline source, payload, options). It accepts no body and cannot change the output.",
     "version": "1.0",
     "contact": {}
   },
@@ -674,6 +725,35 @@
           }
         }
       },
+      "OptionsSignatureDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Apply a PAdES digital signature to this document."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Optional reason shown in the signature panel."
+          },
+          "location": {
+            "type": "string",
+            "description": "Optional location shown in the signature panel."
+          },
+          "contactInfo": {
+            "type": "string",
+            "description": "Optional contact info shown in the signature panel."
+          },
+          "certSource": {
+            "type": "string",
+            "enum": [
+              "platform",
+              "byo"
+            ],
+            "description": "Which certificate signs. 'platform' uses PageWeaver's issuer (valid signature, untrusted issuer badge); 'byo' uses your uploaded certificate for a trusted badge (available on Enterprise)."
+          }
+        }
+      },
       "OptionsDownloadSecurityDto": {
         "type": "object",
         "properties": {
@@ -699,6 +779,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/OptionsPdfSecurityDto"
+              }
+            ]
+          },
+          "signature": {
+            "description": "Digital signature: sign this document so it opens with a signed-and-unmodified badge in a PDF reader.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsSignatureDto"
               }
             ]
           },
