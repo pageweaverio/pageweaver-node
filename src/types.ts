@@ -136,6 +136,16 @@ export interface SecurityOptions {
 }
 
 /**
+ * Direct-to-storage delivery routing under `options.delivery` (BYOS). Overrides the template's
+ * delivery setting for this render. `mode`: "all" = every enabled destination; "none" = don't deliver
+ * this document; "selected" = only `destinationIds`. Ids your account doesn't own are ignored.
+ */
+export interface DeliveryOptions {
+  mode?: "all" | "none" | "selected";
+  destinationIds?: string[];
+}
+
+/**
  * The single nested per-render `options` block. Every field is layered on the template
  * version's frozen settings for this render only. Unknown keys are rejected by the API (400).
  */
@@ -149,6 +159,7 @@ export interface RenderOptions {
   structure?: StructureOptions;
   localization?: LocalizationOptions;
   security?: SecurityOptions;
+  delivery?: DeliveryOptions;
 }
 
 // ─── POST /v1/documents ─────────────────────────────────────────────────────────

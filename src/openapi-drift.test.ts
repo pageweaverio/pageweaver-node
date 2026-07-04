@@ -68,6 +68,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "structure",
     "localization",
     "security",
+    "delivery",
   ],
   OptionsPageDto: ["size", "orientation", "margin", "scale"],
   OptionsRenderingDto: [
@@ -88,6 +89,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   OptionsPdfPermissionsDto: ["printing", "copying", "modifying", "annotating", "fillingForms", "assembling"],
   OptionsSignatureDto: ["enabled", "reason", "location", "contactInfo", "certSource"],
   OptionsDownloadSecurityDto: ["enabled", "password", "generate"],
+  OptionsDeliveryDto: ["mode", "destinationIds"],
 };
 
 test("openapi drift: the SDK covers exactly the public endpoint set", () => {

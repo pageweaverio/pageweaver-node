@@ -800,6 +800,27 @@
           }
         }
       },
+      "OptionsDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "all",
+              "none",
+              "selected"
+            ],
+            "description": "Route this document's storage delivery. 'all' = every enabled destination; 'none' = don't deliver this document; 'selected' = only the destinations in `destinationIds`. Overrides the template's delivery setting for this render."
+          },
+          "destinationIds": {
+            "description": "Destination ids to deliver to when `mode` is 'selected'. Ids your account does not own are ignored.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "RenderOptionsDto": {
         "type": "object",
         "properties": {
@@ -872,6 +893,14 @@
             "allOf": [
               {
                 "$ref": "#/components/schemas/OptionsSecurityDto"
+              }
+            ]
+          },
+          "delivery": {
+            "description": "Direct-to-storage delivery routing (BYOS): which of your configured buckets this document is copied to. Overrides the template's delivery setting for this render only.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsDeliveryDto"
               }
             ]
           }
