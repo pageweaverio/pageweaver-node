@@ -751,6 +751,10 @@
               "byo"
             ],
             "description": "Which certificate signs. 'platform' uses PageWeaver's issuer (valid signature, untrusted issuer badge); 'byo' uses your uploaded certificate for a trusted badge (available on Enterprise)."
+          },
+          "timestamp": {
+            "type": "boolean",
+            "description": "Add a trusted timestamp (RFC 3161) to the signature, proving when it was signed independent of our clock. Included with signing."
           }
         }
       },

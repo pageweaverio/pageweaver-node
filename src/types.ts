@@ -127,6 +127,8 @@ export interface SignatureOptions {
   contactInfo?: string;
   /** "platform" (PageWeaver self-signed) or "byo" (your uploaded certificate, Enterprise). */
   certSource?: "platform" | "byo";
+  /** Add an RFC 3161 trusted timestamp (PAdES-B-T) proving when the document was signed. */
+  timestamp?: boolean;
 }
 
 export interface SecurityOptions {
@@ -265,6 +267,11 @@ export interface DocumentSignature {
   signedAt: string | null;
   /** Whether the signer certificate chains to a public trust anchor (a "byo" cert is trusted). */
   trusted: boolean;
+  /**
+   * RFC 3161 trusted timestamp on the signature (PAdES-B-T); null when not timestamped. `at` is the
+   * TSA-attested signing time (independent of PageWeaver's clock); `authority` is the issuing TSA.
+   */
+  timestamp: { at: string | null; authority: string | null } | null;
 }
 
 /** The `GET /v1/documents/:id` body. */

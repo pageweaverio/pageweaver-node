@@ -87,7 +87,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   OptionsSecurityDto: ["pdf", "signature", "download"],
   OptionsPdfSecurityDto: ["userPassword", "ownerPassword", "permissions"],
   OptionsPdfPermissionsDto: ["printing", "copying", "modifying", "annotating", "fillingForms", "assembling"],
-  OptionsSignatureDto: ["enabled", "reason", "location", "contactInfo", "certSource"],
+  OptionsSignatureDto: ["enabled", "reason", "location", "contactInfo", "certSource", "timestamp"],
   OptionsDownloadSecurityDto: ["enabled", "password", "generate"],
   OptionsDeliveryDto: ["mode", "destinationIds"],
 };
