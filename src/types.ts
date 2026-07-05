@@ -166,11 +166,35 @@ export interface RenderOptions {
 
 // ─── POST /v1/documents ─────────────────────────────────────────────────────────
 
+/**
+ * Output selector: produce a raster image (png/jpeg/webp) instead of a PDF. With only `width`, the
+ * image height grows proportionally to fit the page; add `height` + `clip` for an exact crop.
+ * `quality` is jpeg/webp compression; `transparent` gives a transparent background (png/webp).
+ */
+export interface ImageOutput {
+  /** "pdf" (default) or a raster image format. */
+  format?: "pdf" | "png" | "jpeg" | "webp";
+  /** Viewport width in px. With only width set, the height grows proportionally. */
+  width?: number;
+  /** Viewport height in px. Pair with `clip` for an exact crop. */
+  height?: number;
+  /** Clip the image to width×height (an exact crop) instead of capturing the full page. */
+  clip?: boolean;
+  /** Compression quality 1-100 (jpeg/webp only). */
+  quality?: number;
+  /** Transparent background (png/webp only). */
+  transparent?: boolean;
+  /** Trade some image quality for a faster capture. */
+  optimizeForSpeed?: boolean;
+}
+
 interface CreateDocumentCommon {
   /** Data merged into the template/HTML via Liquid. */
   payload?: Record<string, unknown>;
   /** Per-render option overrides, nested under this one key. */
   options?: RenderOptions;
+  /** Produce a raster image instead of a PDF (template + inline renders only). */
+  output?: ImageOutput;
   /**
    * A unique token you generate per document so a retried request returns the original
    * document instead of creating a duplicate. Sent as the `Idempotency-Key` header.
@@ -194,6 +218,7 @@ export interface CreateFromTemplateParams extends CreateDocumentCommon {
   schemaVersion?: number;
   html?: never;
   css?: never;
+  url?: never;
 }
 
 /** Render raw inline HTML with no template. No external images, stylesheets, or JavaScript. */
@@ -203,12 +228,33 @@ export interface CreateFromInlineParams extends CreateDocumentCommon {
   /** CSS applied to the inline HTML (injected as a <style>). */
   css?: string;
   templateId?: never;
+  url?: never;
   version?: never;
   schemaId?: never;
   schemaVersion?: never;
 }
 
-export type CreateDocumentParams = CreateFromTemplateParams | CreateFromInlineParams;
+/**
+ * Snapshot a live external web page to a PDF (url-to-pdf). Available on paid plans; every fetch is
+ * SSRF-checked. No template, payload, schema, or image output — it produces a PDF of the page.
+ */
+export interface CreateFromUrlParams extends CreateDocumentCommon {
+  /** The https URL of the page to snapshot. */
+  url: string;
+  templateId?: never;
+  html?: never;
+  css?: never;
+  payload?: never;
+  version?: never;
+  schemaId?: never;
+  schemaVersion?: never;
+  output?: never;
+}
+
+export type CreateDocumentParams =
+  | CreateFromTemplateParams
+  | CreateFromInlineParams
+  | CreateFromUrlParams;
 
 /** The owner-visible download block, present when a document is download-protected. */
 export interface DownloadInfo {
@@ -279,6 +325,8 @@ export interface Document {
   id: string;
   status: DocumentStatus;
   version: number | null;
+  /** The output format this document produces: "pdf" (default), "png", "jpeg", or "webp". */
+  outputFormat: string;
   download?: DownloadInfo;
   /** Present when `status` is "failed". */
   error?: string;
@@ -314,6 +362,8 @@ export interface DocumentListItem {
   version: number | null;
   status: DocumentStatus;
   source: string;
+  /** Output format: "pdf" | "png" | "jpeg" | "webp". */
+  outputFormat: string;
   pages: number | null;
   bytes: number | null;
   /** ISO 8601 timestamp. */

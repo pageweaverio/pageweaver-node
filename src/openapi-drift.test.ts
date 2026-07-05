@@ -50,6 +50,8 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "templateId",
     "html",
     "css",
+    "url",
+    "output",
     "payload",
     "version",
     "schemaId",
@@ -58,6 +60,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "callbackUrl",
     "options",
   ],
+  OutputDto: ["format", "width", "height", "clip", "quality", "transparent", "optimizeForSpeed"],
   RenderOptionsDto: [
     "page",
     "rendering",

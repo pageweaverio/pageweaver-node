@@ -916,7 +916,7 @@
           "templateId": {
             "type": "string",
             "example": "sample-invoice",
-            "description": "Template id (or the built-in 'sample-invoice'). Provide EITHER templateId OR inline `html` (exactly one). Omit for an inline render."
+            "description": "Template id (or the built-in 'sample-invoice'). Provide EXACTLY ONE content source: `templateId`, inline `html`, or `url`."
           },
           "html": {
             "type": "string",
@@ -1003,6 +1003,69 @@
                 "$ref": "#/components/schemas/RenderOptionsDto"
               }
             ]
+          },
+          "url": {
+            "type": "string",
+            "example": "https://example.com/report",
+            "description": "url-to-pdf: an https URL of a live web page to snapshot into a PDF. Mutually exclusive with `templateId` and `html`; no payload/schema/version. Every fetch is SSRF-checked (private and reserved hosts are blocked). Available on paid plans."
+          },
+          "output": {
+            "description": "Produce a raster image (png/jpeg/webp) instead of a PDF, with optional sizing / transparency / quality. Omit for the default PDF. Not compatible with a `url` render or with PDF-only options (digital signature, PDF open-password, tagged PDF).",
+            "example": {
+              "format": "png",
+              "width": 1200,
+              "transparent": true
+            },
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputDto"
+              }
+            ]
+          }
+        }
+      },
+      "OutputDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "png",
+              "jpeg",
+              "webp"
+            ],
+            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document."
+          },
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Image viewport width in px. With only width set, the height grows proportionally."
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Image viewport height in px. Pair with `clip` for an exact crop."
+          },
+          "clip": {
+            "type": "boolean",
+            "description": "Clip the image to width×height (an exact crop) instead of capturing the full page."
+          },
+          "quality": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Compression quality 1-100 (jpeg/webp only). Higher is clearer and larger."
+          },
+          "transparent": {
+            "type": "boolean",
+            "description": "Transparent background (png/webp only). Ignored for jpeg and pdf."
+          },
+          "optimizeForSpeed": {
+            "type": "boolean",
+            "description": "Trade some image quality for a faster capture."
           }
         }
       }
