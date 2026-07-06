@@ -964,3 +964,91 @@ export interface PromotePinsResult {
   promoted: number;
   pins: EnvironmentPin[];
 }
+
+// ── Deployments (Pillar 3, documents-as-code) ───────────────────────────────────
+
+export type DeploymentStatus = "planned" | "applying" | "succeeded" | "failed" | "rolled_back";
+export type DeploymentSource = "cli" | "github" | "portal";
+export type DeploymentAction = "create" | "update" | "delete" | "noop";
+export type DeploymentResourceType = "template" | "schema" | "environmentPin" | "webhook" | "schedule";
+
+/** One Terraform-style change line in a deployment plan. */
+export interface DeploymentChange {
+  type: "template" | "schema" | "webhook" | "schedule";
+  name: string;
+  action: DeploymentAction;
+  beforeHash: string | null;
+  afterHash: string | null;
+}
+
+/** A non-fatal advisory attached to a plan (never a silent mutation). */
+export interface DeploymentWarning {
+  code: string;
+  message: string;
+  resource?: string;
+}
+
+/** The reviewable plan output persisted on a `planned` deployment. */
+export interface DeploymentPlan {
+  changes: DeploymentChange[];
+  warnings: DeploymentWarning[];
+}
+
+/** A deployment as returned by plan/list. */
+export interface Deployment {
+  id: string;
+  status: DeploymentStatus;
+  /** The target environment slug, or null. */
+  environment: string | null;
+  source: DeploymentSource;
+  sourceRef: string | null;
+  /** The git commit the manifest was rendered at (null for a keyed ad-hoc plan). */
+  commitSha: string | null;
+  /** SHA-256 of the canonicalized manifest — the drift + idempotency handle. */
+  manifestHash: string;
+  plan: DeploymentPlan;
+  createdAt: string;
+}
+
+/** One resource-level line of a deployment with its apply outcome. */
+export interface DeploymentResource {
+  resourceType: DeploymentResourceType;
+  name: string;
+  action: DeploymentAction;
+  beforeHash: string | null;
+  afterHash: string | null;
+  /** "pending" | "applied" | "failed" | "skipped". */
+  status: string;
+  error: string | null;
+}
+
+/** A deployment with its per-resource plan lines (the `GET /v1/deployments/:id` shape). */
+export interface DeploymentDetail extends Deployment {
+  resources: DeploymentResource[];
+}
+
+/** Body of `POST /v1/deployments/plan`. */
+export interface PlanDeploymentParams {
+  /** Target environment slug the plan diffs against. */
+  environment: string;
+  /** The raw pageweaver.yml manifest text. */
+  manifest: string;
+  /** Manifest-relative path → UTF-8 contents for every file the manifest names. */
+  files: Record<string, string>;
+  /** The commit the manifest was rendered at (enables idempotent re-plan). */
+  commitSha?: string;
+  /** Branch/tag/workflow-run ref for provenance. */
+  sourceRef?: string;
+  /** Where the plan originated (provenance only). Defaults to "cli". */
+  source?: DeploymentSource;
+  /** Values for resolving `${NAME}` references in the manifest (e.g. a webhook URL secret). */
+  env?: Record<string, string>;
+}
+
+/** Query params for `GET /v1/deployments`. */
+export interface ListDeploymentsParams {
+  /** Filter to one environment slug. */
+  environment?: string;
+  /** Max rows (1–200, default 50). */
+  limit?: number;
+}

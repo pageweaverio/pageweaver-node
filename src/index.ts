@@ -18,6 +18,7 @@ export { CommentsResource } from "./comments";
 export { ReviewsResource } from "./reviews";
 export { ShareLinksResource } from "./shareLinks";
 export { EnvironmentsResource } from "./environments";
+export { DeploymentsResource } from "./deployments";
 
 export {
   PageWeaverError,
@@ -143,4 +144,17 @@ export type {
   UpdateEnvironmentParams,
   PromotePinsParams,
   PromotePinsResult,
+  // Deployments (Pillar 3)
+  DeploymentStatus,
+  DeploymentSource,
+  DeploymentAction,
+  DeploymentResourceType,
+  DeploymentChange,
+  DeploymentWarning,
+  DeploymentPlan,
+  Deployment,
+  DeploymentResource,
+  DeploymentDetail,
+  PlanDeploymentParams,
+  ListDeploymentsParams,
 } from "./types";

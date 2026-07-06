@@ -1862,6 +1862,98 @@
           "environments"
         ]
       }
+    },
+    "/v1/deployments/plan": {
+      "post": {
+        "description": "Re-validate a manifest and its named file contents server-side, diff it against the target environment's live state, and persist a reviewable `planned` deployment. Returns 202 with the plan (a Terraform-style change list with before/after hashes); an unchanged manifest plans all no-op. Re-planning the same manifest at the same commit (or Idempotency-Key) returns the existing plan. Nothing is applied until POST /v1/deployments/:id/apply.",
+        "operationId": "DeploymentsController_plan",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Optional. For an ad-hoc plan without a commitSha, a unique token so a retried request returns the original plan instead of creating a duplicate.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanDeploymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Plan a deployment",
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/v1/deployments": {
+      "get": {
+        "description": "Recent deployments for the account, newest first. Filter by `environment` slug.",
+        "operationId": "DeploymentsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List deployments",
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/v1/deployments/{id}": {
+      "get": {
+        "description": "One deployment with its per-resource plan lines and their apply outcomes.",
+        "operationId": "DeploymentsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a deployment",
+        "tags": [
+          "deployments"
+        ]
+      }
     }
   },
   "info": {
@@ -3045,6 +3137,63 @@
         },
         "required": [
           "from"
+        ]
+      },
+      "PlanDeploymentDto": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "type": "string",
+            "example": "production",
+            "description": "Target environment slug the plan diffs against and apply will write pins into."
+          },
+          "manifest": {
+            "type": "string",
+            "description": "The raw pageweaver.yml manifest text.",
+            "example": "apiVersion: pageweaver.io/v1\nkind: Manifest\n..."
+          },
+          "files": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Manifest-relative path → UTF-8 file contents for every file the manifest names (templates, schemas, test data). The CLI uploads only the referenced files, not the repository. Per-file and total size caps apply (mirroring the inline-render limits).",
+            "example": {
+              "templates/invoice.html": "<h1>{{ title }}</h1>",
+              "schemas/invoice.json": "[]"
+            }
+          },
+          "commitSha": {
+            "type": "string",
+            "description": "The commit the manifest was rendered at. With a commitSha, re-planning the same manifest at the same commit returns the existing Deployment (idempotent). Omit for an ad-hoc plan.",
+            "example": "9f3c1a2"
+          },
+          "sourceRef": {
+            "type": "string",
+            "description": "Branch/tag/workflow-run ref for provenance, e.g. 'refs/heads/main' or a PR number.",
+            "example": "refs/heads/main"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "cli",
+              "github",
+              "portal"
+            ],
+            "description": "Where the plan originated (provenance only). Defaults to 'cli'."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Optional environment values for resolving `${NAME}` references in the manifest (e.g. a webhook URL secret). Secrets are used to compute config hashes and are never stored or echoed back."
+          }
+        },
+        "required": [
+          "environment",
+          "manifest",
+          "files"
         ]
       }
     }

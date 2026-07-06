@@ -78,6 +78,10 @@ const EXPECTED_ENDPOINTS: string[] = [
   "put /v1/environments/{slug}/pins/{templateId}",
   "delete /v1/environments/{slug}/pins/{templateId}",
   "post /v1/environments/{slug}/promote",
+  // Deployments — documents-as-code (Pillar 3, V2-C02).
+  "post /v1/deployments/plan",
+  "get /v1/deployments",
+  "get /v1/deployments/{id}",
 ];
 
 /**
@@ -188,6 +192,8 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   UpdateEnvironmentDto: ["name", "isProduction"],
   SetPinDto: ["version"],
   PromotePinsDto: ["from", "templates"],
+  // Deployments request DTO (Pillar 3, V2-C02).
+  PlanDeploymentDto: ["environment", "manifest", "files", "commitSha", "sourceRef", "source", "env"],
 };
 
 test("openapi drift: the SDK covers exactly the public endpoint set", () => {

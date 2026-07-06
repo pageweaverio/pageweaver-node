@@ -575,3 +575,39 @@ test("documents.create accepts an environment selector in the body", async () =>
 
   assert.deepEqual(calls[0]?.body, { templateId: "tmpl_x", payload: { total: 1 }, environment: "production" });
 });
+
+test("deployments.plan / list / get hit /v1/deployments with the idempotency header", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, {
+      id: "dep_1",
+      status: "planned",
+      environment: "production",
+      source: "cli",
+      sourceRef: null,
+      commitSha: "9f3c1a2",
+      manifestHash: "abc",
+      plan: { changes: [], warnings: [] },
+      createdAt: "t",
+    }),
+    json(200, [{ id: "dep_1", status: "planned", environment: "production", source: "cli", sourceRef: null, commitSha: null, manifestHash: "abc", plan: { changes: [], warnings: [] }, createdAt: "t" }]),
+    json(200, { id: "dep_1", status: "planned", environment: "production", source: "cli", sourceRef: null, commitSha: "9f3c1a2", manifestHash: "abc", plan: { changes: [], warnings: [] }, createdAt: "t", resources: [] }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const plan = await pw.deployments.plan(
+    { environment: "production", manifest: "apiVersion: pageweaver.io/v1", files: { "a.html": "<p/>" }, commitSha: "9f3c1a2" },
+    { idempotencyKey: "idem-42" },
+  );
+  assert.equal(plan.id, "dep_1");
+  assert.equal(calls[0]?.method, "POST");
+  assert.equal(calls[0]?.url, "http://api.test/v1/deployments/plan");
+  assert.equal(calls[0]?.headers["Idempotency-Key"], "idem-42");
+
+  const list = await pw.deployments.list({ environment: "production" });
+  assert.equal(list[0]?.id, "dep_1");
+  assert.equal(calls[1]?.url, "http://api.test/v1/deployments?environment=production");
+
+  const detail = await pw.deployments.get("dep_1");
+  assert.deepEqual(detail.resources, []);
+  assert.equal(calls[2]?.url, "http://api.test/v1/deployments/dep_1");
+});
