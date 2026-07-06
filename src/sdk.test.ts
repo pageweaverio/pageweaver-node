@@ -269,6 +269,24 @@ test("templates.versions calls the right path", async () => {
   assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_1/versions");
 });
 
+test("templates.version fetches one version with include=source", async () => {
+  const { fetch, calls } = mockFetch([json(200, { version: 3, editorMode: "code", source: {} })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.templates.version("tmpl_1", 3, { include: "source" });
+
+  assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_1/versions/3?include=source");
+});
+
+test("schemas.version fetches one version with include=nodes", async () => {
+  const { fetch, calls } = mockFetch([json(200, { version: 2, nodes: [] })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.schemas.version("schema_1", 2, { include: "nodes" });
+
+  assert.equal(calls[0]?.url, "http://api.test/v1/schemas/schema_1/versions/2?include=nodes");
+});
+
 test("verifyWebhook round-trips and rejects tampering", () => {
   const secret = "whsec_test";
   const payload = {

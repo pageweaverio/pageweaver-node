@@ -1,5 +1,10 @@
 import type { HttpClient } from "./http";
-import type { Schema, SchemaSummary, SchemaVersionSummary } from "./types";
+import type {
+  Schema,
+  SchemaSummary,
+  SchemaVersionDetail,
+  SchemaVersionSummary,
+} from "./types";
 
 /** Read-only discovery of the JSON Schemas your payloads validate against. */
 export class SchemasResource {
@@ -27,6 +32,22 @@ export class SchemasResource {
       "GET",
       `/v1/schemas/${encodeURIComponent(id)}/versions`,
       { signal },
+    );
+  }
+
+  /**
+   * One published version's metadata, plus its frozen FieldNode tree when `include: "nodes"` — the typed
+   * structure `pageweaver pull` writes to `schemas/<name>.nodes.json`.
+   */
+  version(
+    id: string,
+    version: number,
+    opts: { include?: "nodes"; signal?: AbortSignal } = {},
+  ): Promise<SchemaVersionDetail> {
+    return this.http.json<SchemaVersionDetail>(
+      "GET",
+      `/v1/schemas/${encodeURIComponent(id)}/versions/${encodeURIComponent(version)}`,
+      { query: { include: opts.include }, signal: opts.signal },
     );
   }
 }

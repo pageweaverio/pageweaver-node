@@ -77,9 +77,12 @@ export type {
   TemplateSummary,
   Template,
   TemplateVersionSummary,
+  TemplateVersionSource,
+  TemplateVersionDetail,
   SchemaSummary,
   Schema,
   SchemaVersionSummary,
+  SchemaVersionDetail,
   Usage,
   // Review layer
   AnchorType,

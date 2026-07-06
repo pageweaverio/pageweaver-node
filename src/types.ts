@@ -433,6 +433,32 @@ export interface TemplateVersionSummary {
   derivedFromVersion: number | null;
 }
 
+/** The frozen editor source of a template version (returned by `version(id, n, { include: "source" })`). */
+export interface TemplateVersionSource {
+  /** Frozen compiled Liquid HTML. */
+  compiledHtml: string;
+  css: string;
+  /** Frozen Gotenberg render settings, or null. */
+  renderSettings: Record<string, unknown> | null;
+  /** Frozen test-data payload. */
+  testData: unknown;
+  /** The schema this version pins (null when it uses an inline payload schema). */
+  schemaId: string | null;
+  schemaVersion: number | null;
+  /** The live template's completion-webhook toggle (part of the deploy content hash). */
+  notifyOnComplete: boolean;
+}
+
+/** One published template version: summary metadata, plus `source` when `include: "source"` was asked. */
+export interface TemplateVersionDetail {
+  version: number;
+  note: string | null;
+  publishedAt: string;
+  derivedFromVersion: number | null;
+  editorMode: string;
+  source?: TemplateVersionSource;
+}
+
 export interface SchemaSummary {
   id: string;
   name: string;
@@ -457,6 +483,17 @@ export interface SchemaVersionSummary {
   note: string | null;
   /** ISO 8601 timestamp. */
   publishedAt: string;
+}
+
+/** One published schema version: metadata, plus the FieldNode tree when `include: "nodes"` was asked. */
+export interface SchemaVersionDetail {
+  version: number;
+  note: string | null;
+  publishedAt: string;
+  title: string | null;
+  description: string | null;
+  /** The frozen typed field tree (FieldNode[]); present only with `include: "nodes"`. */
+  nodes?: unknown[];
 }
 
 // ─── GET /v1/usage ──────────────────────────────────────────────────────────────

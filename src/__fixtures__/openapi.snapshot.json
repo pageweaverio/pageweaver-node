@@ -61,7 +61,7 @@
         ]
       },
       "get": {
-        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, createdAfter/createdBefore (ISO date-time, bounding creation time), and delivery (the webhook-delivery state of each document: 'undelivered' for documents that were subscribed to a webhook but never delivered successfully — the set to reconcile after an endpoint outage — plus 'failed', 'delivered', 'pending', 'skipped', or 'none' for documents with no webhook). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
+        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, createdAfter/createdBefore (ISO date-time, bounding creation time), and delivery (the webhook-delivery state of each document: 'undelivered' for documents that were subscribed to a webhook but never delivered successfully \u00e2\u20ac\u201d the set to reconcile after an endpoint outage \u00e2\u20ac\u201d plus 'failed', 'delivered', 'pending', 'skipped', or 'none' for documents with no webhook). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
         "operationId": "RendersController_list",
         "parameters": [
           {
@@ -207,7 +207,7 @@
     },
     "/v1/documents/{id}/regenerate": {
       "post": {
-        "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything — it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",
+        "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything \u00e2\u20ac\u201d it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",
         "operationId": "RendersController_regenerate",
         "parameters": [
           {
@@ -262,7 +262,7 @@
     },
     "/v1/usage": {
       "get": {
-        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page — a 10-page PDF counts as 10; failed renders aren't counted.",
+        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page \u00e2\u20ac\u201d a 10-page PDF counts as 10; failed renders aren't counted.",
         "operationId": "UsageController_usage",
         "parameters": [],
         "responses": {
@@ -327,6 +327,52 @@
           }
         ],
         "summary": "List template versions",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/v1/templates/{id}/versions/{version}": {
+      "get": {
+        "description": "One published version's metadata. Pass `?include=source` to also return the frozen editor source (compiled HTML + CSS, render settings, test data, pinned schema) \u2014 what `pageweaver pull` exports to round-trip a deployment. `read` scope; unknown version returns 404.",
+        "operationId": "TemplatesController_versionDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a template version",
         "tags": [
           "templates"
         ]
@@ -408,6 +454,52 @@
           }
         ],
         "summary": "List schema versions",
+        "tags": [
+          "schemas"
+        ]
+      }
+    },
+    "/v1/schemas/{id}/versions/{version}": {
+      "get": {
+        "description": "One published version's metadata. Pass `?include=nodes` to also return the frozen typed field tree (FieldNode[]) \u2014 what `pageweaver pull` exports so a re-deployed schema matches. `read` scope; unknown version returns 404.",
+        "operationId": "SchemasController_versionDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a schema version",
         "tags": [
           "schemas"
         ]
@@ -652,7 +744,7 @@
     },
     "/v1/comments/{id}/close": {
       "post": {
-        "description": "Close a thread (final — it can no longer change state).",
+        "description": "Close a thread (final \u00e2\u20ac\u201d it can no longer change state).",
         "operationId": "CommentsController_close",
         "parameters": [
           {
@@ -762,7 +854,7 @@
     },
     "/v1/documents/{id}/pages": {
       "get": {
-        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist — the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
+        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist \u00e2\u20ac\u201d the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
         "operationId": "DocumentCommentsController_listPages",
         "parameters": [
           {
@@ -1711,7 +1803,7 @@
     },
     "/v1/environments/{slug}/pins": {
       "get": {
-        "description": "The template → version pointers in this environment.",
+        "description": "The template \u00e2\u2020\u2019 version pointers in this environment.",
         "operationId": "EnvironmentsController_listPins",
         "parameters": [
           {
@@ -1825,7 +1917,7 @@
     },
     "/v1/environments/{slug}/promote": {
       "post": {
-        "description": "Copy another environment's pin set onto this one (e.g. staging → production). Pass `templates` to partial-promote. Version history is never touched — only pointers move.",
+        "description": "Copy another environment's pin set onto this one (e.g. staging \u00e2\u2020\u2019 production). Pass `templates` to partial-promote. Version history is never touched \u00e2\u20ac\u201d only pointers move.",
         "operationId": "EnvironmentsController_promote",
         "parameters": [
           {
@@ -2099,7 +2191,7 @@
           },
           "clip": {
             "type": "boolean",
-            "description": "Clip the image to width×height (an exact crop) instead of capturing the full page."
+            "description": "Clip the image to width\u00c3\u2014height (an exact crop) instead of capturing the full page."
           },
           "quality": {
             "type": "number",
@@ -2703,25 +2795,25 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized x (0-1) — point/area/text."
+            "description": "Normalized x (0-1) \u00e2\u20ac\u201d point/area/text."
           },
           "y": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized y (0-1) — point/area/text."
+            "description": "Normalized y (0-1) \u00e2\u20ac\u201d point/area/text."
           },
           "width": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized width (0-1) — area/text."
+            "description": "Normalized width (0-1) \u00e2\u20ac\u201d area/text."
           },
           "height": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized height (0-1) — area/text."
+            "description": "Normalized height (0-1) \u00e2\u20ac\u201d area/text."
           },
           "selectedText": {
             "type": "string",
@@ -3032,7 +3124,7 @@
             "description": "Require an email (not just a name) before the external reviewer can interact (default false)."
           },
           "allowedDomains": {
-            "description": "Restrict the email gate to these domains (e.g. [\"acme.com\"]); empty ⇒ any domain.",
+            "description": "Restrict the email gate to these domains (e.g. [\"acme.com\"]); empty \u00e2\u2021\u2019 any domain.",
             "type": "array",
             "items": {
               "type": "string"
@@ -3071,7 +3163,7 @@
           },
           "password": {
             "type": "string",
-            "description": "Optional password gate (6–128 chars); stored scrypt-hashed."
+            "description": "Optional password gate (6\u00e2\u20ac\u201c128 chars); stored scrypt-hashed."
           },
           "expiresAt": {
             "type": "string",
@@ -3237,7 +3329,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Manifest-relative path → UTF-8 file contents for every file the manifest names (templates, schemas, test data). The CLI uploads only the referenced files, not the repository. Per-file and total size caps apply (mirroring the inline-render limits).",
+            "description": "Manifest-relative path \u00e2\u2020\u2019 UTF-8 file contents for every file the manifest names (templates, schemas, test data). The CLI uploads only the referenced files, not the repository. Per-file and total size caps apply (mirroring the inline-render limits).",
             "example": {
               "templates/invoice.html": "<h1>{{ title }}</h1>",
               "schemas/invoice.json": "[]"

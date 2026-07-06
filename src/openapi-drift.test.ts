@@ -33,9 +33,11 @@ const EXPECTED_ENDPOINTS: string[] = [
   "get /v1/templates",
   "get /v1/templates/{id}",
   "get /v1/templates/{id}/versions",
+  "get /v1/templates/{id}/versions/{version}",
   "get /v1/schemas",
   "get /v1/schemas/{id}",
   "get /v1/schemas/{id}/versions",
+  "get /v1/schemas/{id}/versions/{version}",
   "get /v1/usage",
   // Review layer (V2-A07): comments, reviews, share links, document pages + comment migration.
   "post /v1/comments",
