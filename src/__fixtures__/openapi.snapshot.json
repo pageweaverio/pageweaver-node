@@ -1863,6 +1863,46 @@
         ]
       }
     },
+    "/v1/environments/{slug}/rollback": {
+      "post": {
+        "description": "Restore a prior deployment's pin set as a NEW pin-only deployment (history is never mutated). Pass `toDeploymentId` to target a specific deployment, or omit it to roll back to the last successful deployment before the current head. Only pointers move; no version is rebuilt.",
+        "operationId": "EnvironmentsController_rollback",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RollbackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Roll back an environment",
+        "tags": [
+          "environments"
+        ]
+      }
+    },
     "/v1/deployments/plan": {
       "post": {
         "description": "Re-validate a manifest and its named file contents server-side, diff it against the target environment's live state, and persist a reviewable `planned` deployment. Returns 202 with the plan (a Terraform-style change list with before/after hashes); an unchanged manifest plans all no-op. Re-planning the same manifest at the same commit (or Idempotency-Key) returns the existing plan. Nothing is applied until POST /v1/deployments/:id/apply.",
@@ -1899,6 +1939,36 @@
           }
         ],
         "summary": "Plan a deployment",
+        "tags": [
+          "deployments"
+        ]
+      }
+    },
+    "/v1/deployments/{id}/apply": {
+      "post": {
+        "description": "Apply a previously planned deployment: publish the changed schema/template versions, write the target environment's pins, and record per-resource outcomes. Returns 202 with the deployment in `applying` (poll GET /v1/deployments/:id for the terminal `succeeded`/`failed`). Re-applying an in-flight or completed deployment returns it unchanged. A production deployment publishing a gate-on template without an approved proposal returns 409 listing the blocking templates.",
+        "operationId": "DeploymentsController_apply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Apply a deployment",
         "tags": [
           "deployments"
         ]
@@ -3138,6 +3208,16 @@
         "required": [
           "from"
         ]
+      },
+      "RollbackDto": {
+        "type": "object",
+        "properties": {
+          "toDeploymentId": {
+            "type": "string",
+            "description": "The deployment id whose pin set to restore. Omit to roll back to the last successful deployment before the current head.",
+            "example": "dep_9f3c1a2b"
+          }
+        }
       },
       "PlanDeploymentDto": {
         "type": "object",

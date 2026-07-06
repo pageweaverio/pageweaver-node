@@ -78,8 +78,10 @@ const EXPECTED_ENDPOINTS: string[] = [
   "put /v1/environments/{slug}/pins/{templateId}",
   "delete /v1/environments/{slug}/pins/{templateId}",
   "post /v1/environments/{slug}/promote",
-  // Deployments — documents-as-code (Pillar 3, V2-C02).
+  "post /v1/environments/{slug}/rollback",
+  // Deployments — documents-as-code (Pillar 3, V2-C02 plan; V2-C03 apply).
   "post /v1/deployments/plan",
+  "post /v1/deployments/{id}/apply",
   "get /v1/deployments",
   "get /v1/deployments/{id}",
 ];
@@ -192,7 +194,8 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   UpdateEnvironmentDto: ["name", "isProduction"],
   SetPinDto: ["version"],
   PromotePinsDto: ["from", "templates"],
-  // Deployments request DTO (Pillar 3, V2-C02).
+  RollbackDto: ["toDeploymentId"],
+  // Deployments request DTO (Pillar 3, V2-C02). Apply takes no body (path param only).
   PlanDeploymentDto: ["environment", "manifest", "files", "commitSha", "sourceRef", "source", "env"],
 };
 

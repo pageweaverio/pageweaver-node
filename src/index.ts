@@ -144,6 +144,8 @@ export type {
   UpdateEnvironmentParams,
   PromotePinsParams,
   PromotePinsResult,
+  RollbackParams,
+  RollbackResult,
   // Deployments (Pillar 3)
   DeploymentStatus,
   DeploymentSource,

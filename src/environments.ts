@@ -5,6 +5,8 @@ import type {
   EnvironmentPin,
   PromotePinsParams,
   PromotePinsResult,
+  RollbackParams,
+  RollbackResult,
   UpdateEnvironmentParams,
 } from "./types";
 
@@ -90,6 +92,19 @@ export class EnvironmentsResource {
     return this.http.json<PromotePinsResult>(
       "POST",
       `/v1/environments/${encodeURIComponent(slug)}/promote`,
+      { body: params, signal },
+    );
+  }
+
+  /**
+   * Roll an environment back to a prior deployment's pin set (a NEW pin-only deployment; history is never
+   * mutated). Pass `toDeploymentId` to target a specific deployment, or omit it to roll back to the last
+   * successful deployment before the current head. Only pointers move.
+   */
+  rollback(slug: string, params: RollbackParams = {}, signal?: AbortSignal): Promise<RollbackResult> {
+    return this.http.json<RollbackResult>(
+      "POST",
+      `/v1/environments/${encodeURIComponent(slug)}/rollback`,
       { body: params, signal },
     );
   }

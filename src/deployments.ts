@@ -46,4 +46,18 @@ export class DeploymentsResource {
       signal,
     });
   }
+
+  /**
+   * Apply a planned deployment: publish the changed schema/template versions and write the environment's
+   * pins. Returns `202` with the deployment in `applying` — poll `get(id)` for the terminal
+   * `succeeded`/`failed`. Re-applying an in-flight or completed deployment returns it unchanged; a
+   * production deployment publishing a gate-on template without an approved proposal returns `409`.
+   */
+  apply(id: string, signal?: AbortSignal): Promise<DeploymentDetail> {
+    return this.http.json<DeploymentDetail>(
+      "POST",
+      `/v1/deployments/${encodeURIComponent(id)}/apply`,
+      { signal },
+    );
+  }
 }

@@ -567,6 +567,19 @@ test("environments.pins / setPin / removePin / promote hit the pin sub-paths", a
   assert.deepEqual(calls[3]?.body, { from: "staging", templates: ["tmpl_x"] });
 });
 
+test("environments.rollback posts to the rollback sub-path", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { deploymentId: "dep_new", restored: [], rolledBack: "dep_old" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const res = await pw.environments.rollback("production", { toDeploymentId: "dep_old" });
+  assert.equal(res.rolledBack, "dep_old");
+  assert.equal(calls[0]?.method, "POST");
+  assert.equal(calls[0]?.url, "http://api.test/v1/environments/production/rollback");
+  assert.deepEqual(calls[0]?.body, { toDeploymentId: "dep_old" });
+});
+
 test("documents.create accepts an environment selector in the body", async () => {
   const { fetch, calls } = mockFetch([json(202, { id: "doc_9", status: "queued", version: 7 })]);
   const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
@@ -610,4 +623,27 @@ test("deployments.plan / list / get hit /v1/deployments with the idempotency hea
   const detail = await pw.deployments.get("dep_1");
   assert.deepEqual(detail.resources, []);
   assert.equal(calls[2]?.url, "http://api.test/v1/deployments/dep_1");
+});
+
+test("deployments.apply posts to the apply sub-path", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, {
+      id: "dep_1",
+      status: "applying",
+      environment: "production",
+      source: "cli",
+      sourceRef: null,
+      commitSha: "9f3c1a2",
+      manifestHash: "abc",
+      plan: { changes: [], warnings: [] },
+      createdAt: "t",
+      resources: [],
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const applied = await pw.deployments.apply("dep_1");
+  assert.equal(applied.status, "applying");
+  assert.equal(calls[0]?.method, "POST");
+  assert.equal(calls[0]?.url, "http://api.test/v1/deployments/dep_1/apply");
 });

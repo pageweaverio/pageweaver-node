@@ -959,10 +959,25 @@ export interface PromotePinsParams {
   templates?: string[];
 }
 
-/** `POST …/promote` result: how many pins moved plus the resulting pins. */
+/** `POST …/promote` result: how many pins moved, the resulting pins, and the recorded deployment id. */
 export interface PromotePinsResult {
   promoted: number;
   pins: EnvironmentPin[];
+  /** The pin-only Deployment this promote recorded (null when nothing moved). */
+  deploymentId?: string | null;
+}
+
+/** Body of `POST …/rollback`. */
+export interface RollbackParams {
+  /** Deployment id whose pin set to restore. Omit to roll back to the last successful deployment. */
+  toDeploymentId?: string;
+}
+
+/** `POST …/rollback` result: the new deployment, the restored pins, and the rolled-back deployment id. */
+export interface RollbackResult {
+  deploymentId: string;
+  restored: EnvironmentPin[];
+  rolledBack: string;
 }
 
 // ── Deployments (Pillar 3, documents-as-code) ───────────────────────────────────
