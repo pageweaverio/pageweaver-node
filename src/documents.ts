@@ -1,14 +1,18 @@
 import type { HttpClient } from "./http";
 import { PageWeaverDocumentFailedError, PageWeaverTimeoutError } from "./errors";
 import type {
+  CommentMigrationRollup,
   CreateDocumentParams,
   CreateDocumentResult,
   CreateSyncResult,
   Document,
   DocumentPage,
+  DocumentPageInfo,
   DocumentStatus,
   DocumentVerification,
   ListDocumentsParams,
+  MigrateCommentsParams,
+  MigrateCommentsResult,
 } from "./types";
 
 /** Statuses at which a document stops changing. */
@@ -214,6 +218,44 @@ export class DocumentsResource {
       return { kind: "pending", id: body.id, version: body.version ?? null, status: body.status };
     }
     return { kind: "document", document: body };
+  }
+
+  /**
+   * A document's per-page geometry (widthPts/heightPts) plus whether extracted text and a thumbnail
+   * exist — enough to place comment anchors without rendering the PDF yourself.
+   */
+  pages(id: string, signal?: AbortSignal): Promise<DocumentPageInfo[]> {
+    return this.http.json<DocumentPageInfo[]>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/pages`,
+      { signal },
+    );
+  }
+
+  /**
+   * Carry open comment threads forward from a previous same-template document onto this one (the
+   * text-quote → context → page-similarity ladder). Returns `202`; observe progress via
+   * {@link commentMigration} and the threads' `migrationStatus`.
+   */
+  migrateComments(
+    id: string,
+    params: MigrateCommentsParams,
+    signal?: AbortSignal,
+  ): Promise<MigrateCommentsResult> {
+    return this.http.json<MigrateCommentsResult>(
+      "POST",
+      `/v1/documents/${encodeURIComponent(id)}/migrate-comments`,
+      { body: params, signal },
+    );
+  }
+
+  /** The comment-migration rollup for a document, grouped by migration status. */
+  commentMigration(id: string, signal?: AbortSignal): Promise<CommentMigrationRollup> {
+    return this.http.json<CommentMigrationRollup>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/comment-migration`,
+      { signal },
+    );
   }
 
   /**

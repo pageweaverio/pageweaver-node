@@ -320,6 +320,17 @@ export interface DocumentSignature {
   timestamp: { at: string | null; authority: string | null } | null;
 }
 
+/** Review activity on a document (beside `integrity`); null when the review layer never touched it. */
+export interface DocumentReviewSummary {
+  openThreads: number;
+  openBlockingThreads: number;
+  resolvedThreads: number;
+  totalThreads: number;
+  /** The open review if one exists, else the most recent; null when none. */
+  review: { id: string; status: string; dueAt: string | null } | null;
+  approvals: number;
+}
+
 /** The `GET /v1/documents/:id` body. */
 export interface Document {
   id: string;
@@ -334,6 +345,8 @@ export interface Document {
   appliedOptions?: Record<string, unknown> | null;
   /** Content fingerprint + chain position; null until the document has finished rendering. */
   integrity?: DocumentIntegrity | null;
+  /** Review activity (thread counts, active review, approval tally); null when untouched by reviews. */
+  review?: DocumentReviewSummary | null;
 }
 
 /** The `GET /v1/documents/:id/verify` body: tamper-evidence + hash-chain attestation. */
@@ -452,4 +465,302 @@ export interface Usage {
   /** Editor PDF-preview pages consumed this period (a separate budget). */
   previewPages: number;
   previewLimit: number;
+}
+
+// ─── Review layer: comments, reviews, approvals, share links ────────────────────
+// The review endpoints require an API key with the `review` scope. Ids are prefixed opaque strings
+// (`cth_` thread, `rev_` review, `apv_` approval, `shl_` share link).
+
+export type AnchorType = "point" | "area" | "text" | "page";
+export type ThreadStatus = "open" | "resolved" | "closed";
+export type CommentSeverity = "info" | "suggestion" | "blocking";
+export type CommentVisibility = "internal" | "external";
+export type MigrationStatus =
+  | "original"
+  | "migrated"
+  | "resolved_by_change"
+  | "needs_relocation"
+  | "failed";
+
+/** A structured `@`mention in a comment body: which member, and the character offset in the body. */
+export interface Mention {
+  userId: string;
+  offset?: number;
+}
+
+/** Body of `POST /v1/comments` — create an anchored thread on a rendered document. */
+export interface CreateCommentParams {
+  documentId: string;
+  anchorType: AnchorType;
+  pageNumber?: number | null;
+  /** Normalized 0–1 coordinates (fractions of the page box). Required per anchor type. */
+  x?: number | null;
+  y?: number | null;
+  width?: number | null;
+  height?: number | null;
+  /** For `text` anchors: the quoted string + context + the page-text hash at creation. */
+  selectedText?: string;
+  textBefore?: string;
+  textAfter?: string;
+  textHash?: string;
+  body: string;
+  severity?: CommentSeverity;
+  visibility?: CommentVisibility;
+  assignedToUserId?: string;
+  /** ISO 8601 timestamp. */
+  dueAt?: string;
+  mentions?: Mention[];
+}
+
+/** Body of `PATCH /v1/comments/:id` — edit severity/assignment/due, or relocate the anchor. */
+export interface UpdateCommentParams {
+  severity?: CommentSeverity;
+  assignedToUserId?: string | null;
+  dueAt?: string | null;
+  pageNumber?: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
+/** Body of `POST /v1/comments/:id/messages` — reply on a thread. */
+export interface ReplyParams {
+  body: string;
+  mentions?: Mention[];
+}
+
+export interface CommentMessage {
+  id: string;
+  body: string;
+  mentions: unknown;
+  authorUserId: string | null;
+  externalAuthorName: string | null;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
+  editedAt: string | null;
+}
+
+/** A comment thread on a document. `messages` is present on the single-thread get, not on lists. */
+export interface CommentThread {
+  id: string;
+  documentId: string | null;
+  anchorType: string;
+  pageNumber: number | null;
+  x: number | null;
+  y: number | null;
+  width: number | null;
+  height: number | null;
+  selectedText: string | null;
+  status: string;
+  severity: string;
+  visibility: string;
+  assignedToUserId: string | null;
+  dueAt: string | null;
+  createdByUserId: string | null;
+  externalAuthorName: string | null;
+  resolvedAt: string | null;
+  migrationStatus: string;
+  migrationConfidence: number | null;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+  messages?: CommentMessage[];
+}
+
+export interface CommentThreadPage {
+  items: CommentThread[];
+  nextCursor: string | null;
+}
+
+export interface ListCommentsParams {
+  pageNumber?: number;
+  status?: ThreadStatus;
+  severity?: CommentSeverity;
+  cursor?: string;
+  /** 1 to 100, default 25. */
+  limit?: number;
+}
+
+export type ReviewStatus = "open" | "completed" | "cancelled" | "expired" | "superseded";
+export type ParticipantRole = "reviewer" | "approver" | "observer";
+export type ParticipantStatus = "pending" | "viewed" | "commented" | "completed" | "declined";
+export type ApprovalDecision = "approved" | "rejected" | "approved_with_comments";
+
+/** The completion policy for a review (null fields fall back to platform defaults). */
+export interface ReviewPolicy {
+  requireAllCommentsResolved?: boolean;
+  blockerCommentsPreventApproval?: boolean;
+  requiredApproverCount?: number;
+  allowApprovalWithOpenComments?: boolean;
+}
+
+export interface ParticipantInput {
+  userId?: string;
+  externalEmail?: string;
+  externalName?: string;
+  role?: ParticipantRole;
+}
+
+/** Body of `POST /v1/reviews`. */
+export interface CreateReviewParams {
+  documentId: string;
+  title?: string;
+  message?: string;
+  /** ISO 8601 timestamp. */
+  dueAt?: string;
+  policy?: ReviewPolicy;
+  participants?: ParticipantInput[];
+}
+
+/** Body of `POST /v1/reviews/:id/participants`. */
+export interface AddParticipantParams {
+  userId?: string;
+  externalEmail?: string;
+  externalName?: string;
+  role?: ParticipantRole;
+}
+
+/** Body of `POST /v1/reviews/:id/approvals`. */
+export interface ApprovalParams {
+  decision: ApprovalDecision;
+  note?: string;
+  approverUserId?: string;
+}
+
+export interface ReviewParticipant {
+  id: string;
+  userId: string | null;
+  externalEmail: string | null;
+  externalName: string | null;
+  role: string;
+  status: string;
+  invitedAt: string;
+  viewedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface Approval {
+  id: string;
+  decision: string;
+  note: string | null;
+  approverUserId: string | null;
+  externalApproverName: string | null;
+  createdAt: string;
+}
+
+export interface ReviewPolicyState {
+  policy: Required<ReviewPolicy>;
+  distinctApprovers: number;
+  openThreads: number;
+  openBlockingThreads: number;
+  requiredApproverCount: number;
+  satisfied: boolean;
+}
+
+/** A review request. `participants`/`approvals`/`policyState` are present on get, not on lists. */
+export interface ReviewRequest {
+  id: string;
+  documentId: string | null;
+  status: string;
+  title: string | null;
+  message: string | null;
+  dueAt: string | null;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  participants?: ReviewParticipant[];
+  approvals?: Approval[];
+  policyState?: ReviewPolicyState;
+}
+
+export interface ReviewPage {
+  items: ReviewRequest[];
+  nextCursor: string | null;
+}
+
+export interface ListReviewsParams {
+  status?: ReviewStatus;
+  documentId?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export type ShareLinkTargetType = "render" | "reviewRequest";
+
+/** The external actor's capability set on a share link. */
+export interface ShareLinkPermissions {
+  canView?: boolean;
+  canComment?: boolean;
+  canDownload?: boolean;
+  canApprove?: boolean;
+  requireEmail?: boolean;
+  allowedDomains?: string[];
+}
+
+/** Body of `POST /v1/share-links`. Provide `documentId` (render) or `reviewRequestId` (review). */
+export interface CreateShareLinkParams {
+  targetType: ShareLinkTargetType;
+  documentId?: string;
+  reviewRequestId?: string;
+  permissions: ShareLinkPermissions;
+  password?: string;
+  /** ISO 8601 timestamp. */
+  expiresAt?: string;
+}
+
+export interface ShareLink {
+  id: string;
+  targetType: string;
+  documentId: string | null;
+  reviewRequestId: string | null;
+  permissions: ShareLinkPermissions;
+  hasPassword: boolean;
+  expiresAt: string | null;
+  disabledAt: string | null;
+  createdAt: string;
+}
+
+/** The `POST /v1/share-links` result — the raw `url`/`token` are returned exactly once. */
+export interface CreatedShareLink extends ShareLink {
+  url: string;
+  token: string;
+}
+
+export interface ShareLinkList {
+  items: ShareLink[];
+}
+
+export interface ListShareLinksParams {
+  documentId?: string;
+  reviewRequestId?: string;
+}
+
+/** One row of `GET /v1/documents/:id/pages` — page geometry for anchoring without a viewer. */
+export interface DocumentPageInfo {
+  pageNumber: number;
+  widthPts: number | null;
+  heightPts: number | null;
+  hasText: boolean;
+  hasThumbnail: boolean;
+}
+
+/** Body of `POST /v1/documents/:id/migrate-comments`. */
+export interface MigrateCommentsParams {
+  fromDocumentId: string;
+}
+
+export interface MigrateCommentsResult {
+  status: string;
+}
+
+/** `GET /v1/documents/:id/comment-migration` rollup, grouped by migration status. */
+export interface CommentMigrationRollup {
+  documentId: string;
+  total: number;
+  migrated: number;
+  resolved_by_change: number;
+  needs_relocation: number;
+  failed: number;
 }

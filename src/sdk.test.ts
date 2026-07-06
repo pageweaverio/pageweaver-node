@@ -296,3 +296,147 @@ test("verifyWebhook round-trips and rejects tampering", () => {
   // Missing signature.
   assert.equal(verifyWebhookSignature(secret, body, undefined), false);
 });
+
+// ─── Review layer (V2-A07) ──────────────────────────────────────────────────────
+
+test("comments.create posts an anchored thread to /v1/comments", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "cth_1", documentId: "doc_1", anchorType: "point", status: "open" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const thread = await pw.comments.create({
+    documentId: "doc_1",
+    anchorType: "point",
+    pageNumber: 1,
+    x: 0.5,
+    y: 0.5,
+    body: "Fix this",
+  });
+
+  assert.equal(thread.id, "cth_1");
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.method, "POST");
+  assert.equal(call.url, "http://api.test/v1/comments");
+  assert.equal(call.headers["x-api-key"], "pk_test_abc");
+  assert.deepEqual(call.body, {
+    documentId: "doc_1",
+    anchorType: "point",
+    pageNumber: 1,
+    x: 0.5,
+    y: 0.5,
+    body: "Fix this",
+  });
+});
+
+test("comments.list hits the document-scoped path with filters as query params", async () => {
+  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.comments.list({ documentId: "doc_1", status: "open", pageNumber: 2 });
+
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.method, "GET");
+  assert.equal(call.url, "http://api.test/v1/documents/doc_1/comments?pageNumber=2&status=open");
+});
+
+test("comments.resolve posts to the resolve sub-path", async () => {
+  const { fetch, calls } = mockFetch([json(200, { id: "cth_1", status: "resolved" })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const thread = await pw.comments.resolve("cth_1");
+
+  assert.equal(thread.status, "resolved");
+  assert.equal(calls[0]?.url, "http://api.test/v1/comments/cth_1/resolve");
+  assert.equal(calls[0]?.method, "POST");
+});
+
+test("reviews.create posts to /v1/reviews with policy + participants", async () => {
+  const { fetch, calls } = mockFetch([json(201, { id: "rev_1", documentId: "doc_1", status: "open" })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const review = await pw.reviews.create({
+    documentId: "doc_1",
+    title: "Sign-off",
+    participants: [{ userId: "usr_2", role: "approver" }],
+    policy: { requiredApproverCount: 2 },
+  });
+
+  assert.equal(review.id, "rev_1");
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.url, "http://api.test/v1/reviews");
+  assert.deepEqual(call.body, {
+    documentId: "doc_1",
+    title: "Sign-off",
+    participants: [{ userId: "usr_2", role: "approver" }],
+    policy: { requiredApproverCount: 2 },
+  });
+});
+
+test("reviews.approve posts a decision to the approvals sub-path", async () => {
+  const { fetch, calls } = mockFetch([json(201, { id: "rev_1", status: "completed" })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.reviews.approve("rev_1", { decision: "approved", note: "LGTM" });
+
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.url, "http://api.test/v1/reviews/rev_1/approvals");
+  assert.deepEqual(call.body, { decision: "approved", note: "LGTM" });
+});
+
+test("reviews.list forwards status + documentId as query params", async () => {
+  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.reviews.list({ status: "open", documentId: "doc_1" });
+
+  assert.equal(calls[0]?.url, "http://api.test/v1/reviews?status=open&documentId=doc_1");
+});
+
+test("shareLinks.create returns the raw url/token once", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "shl_1", url: "http://portal/r/tok", token: "tok", targetType: "render" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const link = await pw.shareLinks.create({
+    targetType: "render",
+    documentId: "doc_1",
+    permissions: { canComment: true },
+  });
+
+  assert.equal(link.url, "http://portal/r/tok");
+  assert.equal(link.token, "tok");
+  assert.equal(calls[0]?.url, "http://api.test/v1/share-links");
+});
+
+test("shareLinks.disable posts to the disable sub-path", async () => {
+  const { fetch, calls } = mockFetch([json(200, { id: "shl_1", disabledAt: "2026-07-06T00:00:00Z" })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.shareLinks.disable("shl_1");
+
+  assert.equal(calls[0]?.url, "http://api.test/v1/share-links/shl_1/disable");
+  assert.equal(calls[0]?.method, "POST");
+});
+
+test("documents.pages + migrateComments hit the document sub-paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, [{ pageNumber: 1, widthPts: 612, heightPts: 792, hasText: true, hasThumbnail: true }]),
+    json(202, { status: "queued" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const pages = await pw.documents.pages("doc_1");
+  assert.equal(pages[0]?.pageNumber, 1);
+  assert.equal(calls[0]?.url, "http://api.test/v1/documents/doc_1/pages");
+
+  const res = await pw.documents.migrateComments("doc_2", { fromDocumentId: "doc_1" });
+  assert.equal(res.status, "queued");
+  assert.equal(calls[1]?.url, "http://api.test/v1/documents/doc_2/migrate-comments");
+  assert.deepEqual(calls[1]?.body, { fromDocumentId: "doc_1" });
+});

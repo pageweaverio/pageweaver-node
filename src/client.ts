@@ -3,6 +3,9 @@ import { DocumentsResource } from "./documents";
 import { TemplatesResource } from "./templates";
 import { SchemasResource } from "./schemas";
 import { UsageResource } from "./usage";
+import { CommentsResource } from "./comments";
+import { ReviewsResource } from "./reviews";
+import { ShareLinksResource } from "./shareLinks";
 
 export interface PageWeaverOptions {
   /** Your secret API key: `pk_live_...` in production, `pk_test_...` in development. */
@@ -32,6 +35,12 @@ export class PageWeaver {
   readonly templates: TemplatesResource;
   readonly schemas: SchemasResource;
   readonly usage: UsageResource;
+  /** Anchored comment threads on documents (requires a `review`-scoped key for writes). */
+  readonly comments: CommentsResource;
+  /** Review requests + approvals on documents (requires a `review`-scoped key for writes). */
+  readonly reviews: ReviewsResource;
+  /** Capability-scoped external share links (requires a `review`-scoped key). */
+  readonly shareLinks: ShareLinksResource;
 
   constructor(options: PageWeaverOptions) {
     const http = new HttpClient(options);
@@ -39,5 +48,8 @@ export class PageWeaver {
     this.templates = new TemplatesResource(http);
     this.schemas = new SchemasResource(http);
     this.usage = new UsageResource(http);
+    this.comments = new CommentsResource(http);
+    this.reviews = new ReviewsResource(http);
+    this.shareLinks = new ShareLinksResource(http);
   }
 }

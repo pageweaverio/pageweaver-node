@@ -450,6 +450,781 @@
           "schemas"
         ]
       }
+    },
+    "/v1/comments": {
+      "post": {
+        "description": "Open an anchored comment thread on a generated document. Supply the `documentId`, an `anchorType` (point / area / text / page) with normalized 0-1 coordinates, and the opening message `body`. Returns 201 with the thread (including its first message).",
+        "operationId": "CommentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a comment thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/comments/{id}": {
+      "get": {
+        "description": "The thread with its anchor, lifecycle state, and full (non-deleted) message history.",
+        "operationId": "CommentsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a comment thread",
+        "tags": [
+          "comments"
+        ]
+      },
+      "patch": {
+        "description": "Change a thread's severity, assignee, due date, or anchor coordinates (manual relocation). Lifecycle changes use the resolve/reopen/close routes, not PATCH.",
+        "operationId": "CommentsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCommentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update a comment thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/comments/{id}/messages": {
+      "post": {
+        "description": "Append a message to an open or resolved thread.",
+        "operationId": "CommentsController_reply",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Reply to a thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/comments/{id}/resolve": {
+      "post": {
+        "description": "Mark an open thread resolved. 409 if it is not open.",
+        "operationId": "CommentsController_resolve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Resolve a thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/comments/{id}/reopen": {
+      "post": {
+        "description": "Reopen a resolved thread. 409 if it is not resolved.",
+        "operationId": "CommentsController_reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Reopen a thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/comments/{id}/close": {
+      "post": {
+        "description": "Close a thread (final — it can no longer change state).",
+        "operationId": "CommentsController_close",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Close a thread",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/documents/{id}/comments": {
+      "get": {
+        "description": "Cursor-paginated comment threads on a document, newest first. Filter by pageNumber, status (open / resolved / closed), and severity (info / suggestion / blocking). Soft-deleted threads are never returned.",
+        "operationId": "DocumentCommentsController_listComments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "open",
+                "resolved",
+                "closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "info",
+                "suggestion",
+                "blocking"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a document's comment threads",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/documents/{id}/pages": {
+      "get": {
+        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist — the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
+        "operationId": "DocumentCommentsController_listPages",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a document's pages",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/documents/{id}/migrate-comments": {
+      "post": {
+        "description": "Migrate the open comment threads from another document of the SAME template onto this one, as new linked threads (the originals are never modified). Each thread is re-anchored by a text-first ladder and tagged with a migration status and confidence; unplaceable threads are flagged for relocation. A regenerated document migrates its predecessor's comments automatically. Returns 202 (the migration runs in the background); poll the migration summary or the document's comments for the result.",
+        "operationId": "DocumentCommentsController_migrateComments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MigrateCommentsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Carry comments forward from a previous document",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/documents/{id}/comment-migration": {
+      "get": {
+        "description": "Counts of the comment threads carried onto this document from an earlier version, grouped by migration status (migrated / resolved_by_change / needs_relocation / failed). Computed on read.",
+        "operationId": "DocumentCommentsController_commentMigration",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Comment migration summary",
+        "tags": [
+          "comments"
+        ]
+      }
+    },
+    "/v1/reviews": {
+      "post": {
+        "description": "Request a review of a generated document. Supply the `documentId`, an optional `policy` (completion knobs), and `participants` (members and/or external reviewers). Creating a review retains the document until the review closes. Returns 201 with the review + policy state.",
+        "operationId": "ReviewsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Open a review request",
+        "tags": [
+          "reviews"
+        ]
+      },
+      "get": {
+        "description": "Filter by ?status= and ?documentId=; cursor paginated.",
+        "operationId": "ReviewsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List review requests",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/v1/reviews/{id}": {
+      "get": {
+        "description": "The request with its participants, append-only approvals, and current policy state.",
+        "operationId": "ReviewsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a review request",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/v1/reviews/{id}/participants": {
+      "post": {
+        "description": "Add a member (userId) or external reviewer (externalEmail + name).",
+        "operationId": "ReviewsController_addParticipant",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddParticipantDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Add a participant",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/v1/reviews/{id}/approvals": {
+      "post": {
+        "description": "Append an approval decision (approved / rejected / approved_with_comments). Returns 409 when the review policy forbids it (e.g. open blocking comments). Reaching the required approvers auto-completes the review.",
+        "operationId": "ReviewsController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Record an approval decision",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/v1/reviews/{id}/complete": {
+      "post": {
+        "description": "Manually mark an open review completed. 409 if not open.",
+        "operationId": "ReviewsController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Complete a review",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/v1/reviews/{id}/cancel": {
+      "post": {
+        "description": "Withdraw an open review. 409 if not open.",
+        "operationId": "ReviewsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Cancel a review",
+        "tags": [
+          "reviews"
+        ]
+      }
+    },
+    "/v1/share-links": {
+      "post": {
+        "description": "Mint a capability-scoped link to a document or review request for an accountless external reviewer. The raw token is returned once in `url` and never stored (only its hash). Set `permissions` (canView/canComment/canDownload/canApprove/requireEmail/allowedDomains), an optional `password`, and an optional `expiresAt`.",
+        "operationId": "ShareLinksController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a share link",
+        "tags": [
+          "share-links"
+        ]
+      },
+      "get": {
+        "description": "Filter by ?documentId= or ?reviewRequestId=; cursor paginated. Tokens are never returned.",
+        "operationId": "ShareLinksController_list",
+        "parameters": [
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reviewRequestId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List share links",
+        "tags": [
+          "share-links"
+        ]
+      }
+    },
+    "/v1/share-links/{id}/disable": {
+      "post": {
+        "description": "Kill switch: every subsequent open is refused and audited.",
+        "operationId": "ShareLinksController_disable",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Disable a share link",
+        "tags": [
+          "share-links"
+        ]
+      }
     }
   },
   "info": {
@@ -474,6 +1249,18 @@
     {
       "name": "usage",
       "description": "Check page consumption against your plan quota for the current period."
+    },
+    {
+      "name": "comments",
+      "description": "Review generated documents: anchored comment threads, replies, and lifecycle (resolve / reopen / close). Requires an API key with the review scope."
+    },
+    {
+      "name": "reviews",
+      "description": "Request reviews on generated documents, add participants, and collect approvals against a completion policy. Requires an API key with the review scope."
+    },
+    {
+      "name": "share-links",
+      "description": "Create capability-scoped links so people without an account can view, comment on, or approve a document. Requires an API key with the review scope."
     }
   ],
   "servers": [],
@@ -486,6 +1273,51 @@
       }
     },
     "schemas": {
+      "OutputDto": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "png",
+              "jpeg",
+              "webp"
+            ],
+            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document."
+          },
+          "width": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Image viewport width in px. With only width set, the height grows proportionally."
+          },
+          "height": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000,
+            "description": "Image viewport height in px. Pair with `clip` for an exact crop."
+          },
+          "clip": {
+            "type": "boolean",
+            "description": "Clip the image to width×height (an exact crop) instead of capturing the full page."
+          },
+          "quality": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Compression quality 1-100 (jpeg/webp only). Higher is clearer and larger."
+          },
+          "transparent": {
+            "type": "boolean",
+            "description": "Transparent background (png/webp only). Ignored for jpeg and pdf."
+          },
+          "optimizeForSpeed": {
+            "type": "boolean",
+            "description": "Trade some image quality for a faster capture."
+          }
+        }
+      },
       "OptionsPageDto": {
         "type": "object",
         "properties": {
@@ -918,6 +1750,24 @@
             "example": "sample-invoice",
             "description": "Template id (or the built-in 'sample-invoice'). Provide EXACTLY ONE content source: `templateId`, inline `html`, or `url`."
           },
+          "url": {
+            "type": "string",
+            "description": "url-to-pdf: an https URL of a live web page to snapshot into a PDF. Mutually exclusive with `templateId` and `html`; no payload/schema/version. Every fetch is SSRF-checked (private and reserved hosts are blocked). Available on paid plans.",
+            "example": "https://example.com/report"
+          },
+          "output": {
+            "description": "Produce a raster image (png/jpeg/webp) instead of a PDF, with optional sizing / transparency / quality. Omit for the default PDF. Not compatible with a `url` render or with PDF-only options (digital signature, PDF open-password, tagged PDF).",
+            "example": {
+              "format": "png",
+              "width": 1200,
+              "transparent": true
+            },
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OutputDto"
+              }
+            ]
+          },
           "html": {
             "type": "string",
             "description": "Inline render: raw HTML to convert directly, with no template. Mutually exclusive with templateId. No external images, stylesheets, or JavaScript are allowed (rejected with a 400). May use Liquid tokens + `payload`; account image assets are referenced by name.",
@@ -1003,71 +1853,430 @@
                 "$ref": "#/components/schemas/RenderOptionsDto"
               }
             ]
-          },
-          "url": {
-            "type": "string",
-            "example": "https://example.com/report",
-            "description": "url-to-pdf: an https URL of a live web page to snapshot into a PDF. Mutually exclusive with `templateId` and `html`; no payload/schema/version. Every fetch is SSRF-checked (private and reserved hosts are blocked). Available on paid plans."
-          },
-          "output": {
-            "description": "Produce a raster image (png/jpeg/webp) instead of a PDF, with optional sizing / transparency / quality. Omit for the default PDF. Not compatible with a `url` render or with PDF-only options (digital signature, PDF open-password, tagged PDF).",
-            "example": {
-              "format": "png",
-              "width": 1200,
-              "transparent": true
-            },
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OutputDto"
-              }
-            ]
           }
         }
       },
-      "OutputDto": {
+      "MentionDto": {
         "type": "object",
         "properties": {
-          "format": {
+          "userId": {
+            "type": "string",
+            "description": "The mentioned member's user id."
+          },
+          "offset": {
+            "type": "number",
+            "description": "Character offset of the mention token in the body."
+          }
+        },
+        "required": [
+          "userId"
+        ]
+      },
+      "CreateCommentDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The document id this comment anchors to (from POST /v1/documents).",
+            "example": "doc_abc123"
+          },
+          "anchorType": {
             "type": "string",
             "enum": [
-              "pdf",
-              "png",
-              "jpeg",
-              "webp"
+              "point",
+              "area",
+              "text",
+              "page"
             ],
-            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document."
+            "description": "How the comment is anchored: 'point' (a pin), 'area' (a rectangle), 'text' (a quoted selection), or 'page' (whole-page feedback)."
+          },
+          "pageNumber": {
+            "type": "number",
+            "minimum": 1,
+            "description": "1-based page number (required for every anchor except a pure page comment on page 1)."
+          },
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Normalized x (0-1) — point/area/text."
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Normalized y (0-1) — point/area/text."
           },
           "width": {
             "type": "number",
-            "minimum": 1,
-            "maximum": 10000,
-            "description": "Image viewport width in px. With only width set, the height grows proportionally."
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Normalized width (0-1) — area/text."
           },
           "height": {
             "type": "number",
-            "minimum": 1,
-            "maximum": 10000,
-            "description": "Image viewport height in px. Pair with `clip` for an exact crop."
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Normalized height (0-1) — area/text."
           },
-          "clip": {
-            "type": "boolean",
-            "description": "Clip the image to width×height (an exact crop) instead of capturing the full page."
+          "selectedText": {
+            "type": "string",
+            "description": "The quoted text a 'text' anchor refers to."
           },
-          "quality": {
+          "textBefore": {
+            "type": "string",
+            "description": "~64 chars of text before the selection (migration context)."
+          },
+          "textAfter": {
+            "type": "string",
+            "description": "~64 chars of text after the selection (migration context)."
+          },
+          "textHash": {
+            "type": "string",
+            "description": "Page-text hash at creation (migration similarity input)."
+          },
+          "body": {
+            "type": "string",
+            "description": "The opening message of the thread.",
+            "example": "The total looks off here."
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "suggestion",
+              "blocking"
+            ],
+            "description": "Thread severity. 'blocking' can gate approval when a review policy says so. Default 'info'."
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "external"
+            ],
+            "description": "Who sees the thread: 'internal' (members only, default) or 'external' (also share-link reviewers)."
+          },
+          "assignedToUserId": {
+            "type": "string",
+            "description": "Assign the thread to a member (their user id)."
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "Optional due date (ISO 8601) for the assignee."
+          },
+          "mentions": {
+            "description": "Members mentioned in the opening message.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MentionDto"
+            }
+          }
+        },
+        "required": [
+          "documentId",
+          "anchorType",
+          "body"
+        ]
+      },
+      "UpdateCommentDto": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "suggestion",
+              "blocking"
+            ],
+            "description": "New severity."
+          },
+          "assignedToUserId": {
+            "type": "object",
+            "nullable": true,
+            "description": "Assign to a member (user id), or null to unassign."
+          },
+          "dueAt": {
+            "type": "object",
+            "nullable": true,
+            "description": "Due date (ISO 8601), or null to clear."
+          },
+          "pageNumber": {
             "type": "number",
             "minimum": 1,
-            "maximum": 100,
-            "description": "Compression quality 1-100 (jpeg/webp only). Higher is clearer and larger."
+            "description": "Relocated page number (with the coordinates below)."
           },
-          "transparent": {
-            "type": "boolean",
-            "description": "Transparent background (png/webp only). Ignored for jpeg and pdf."
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Relocated normalized x (0-1)."
           },
-          "optimizeForSpeed": {
-            "type": "boolean",
-            "description": "Trade some image quality for a faster capture."
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Relocated normalized y (0-1)."
+          },
+          "width": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Relocated normalized width (0-1)."
+          },
+          "height": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Relocated normalized height (0-1)."
           }
         }
+      },
+      "ReplyDto": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "description": "The reply text.",
+            "example": "Fixed in the next revision."
+          },
+          "mentions": {
+            "description": "Members mentioned in the reply.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MentionDto"
+            }
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "MigrateCommentsDto": {
+        "type": "object",
+        "properties": {
+          "fromDocumentId": {
+            "type": "string",
+            "description": "The id of a previously generated document, from the SAME template, whose open comment threads should be carried forward onto this document. Both must belong to your account.",
+            "example": "doc_9f2c1b7a"
+          }
+        },
+        "required": [
+          "fromDocumentId"
+        ]
+      },
+      "ReviewPolicyDto": {
+        "type": "object",
+        "properties": {
+          "requireAllCommentsResolved": {
+            "type": "boolean",
+            "description": "Every thread must be resolved before the review can auto-complete."
+          },
+          "blockerCommentsPreventApproval": {
+            "type": "boolean",
+            "description": "An open blocking-severity comment prevents approval + completion (default true)."
+          },
+          "requiredApproverCount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Distinct approvers required to complete the review (default 1)."
+          },
+          "allowApprovalWithOpenComments": {
+            "type": "boolean",
+            "description": "When false, an approval is refused while any comment is open (default true)."
+          }
+        }
+      },
+      "ParticipantInputDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "A member's user id (mutually exclusive with externalEmail)."
+          },
+          "externalEmail": {
+            "type": "string",
+            "description": "An accountless external reviewer's email (mutually exclusive with userId)."
+          },
+          "externalName": {
+            "type": "string",
+            "description": "Display name for an external reviewer."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "reviewer",
+              "approver",
+              "observer"
+            ],
+            "description": "Participant role: reviewer (default), approver, or observer."
+          }
+        }
+      },
+      "CreateReviewDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The document to review (from POST /v1/documents).",
+            "example": "doc_abc123"
+          },
+          "title": {
+            "type": "string",
+            "description": "A short title for the review."
+          },
+          "message": {
+            "type": "string",
+            "description": "An opening message to the participants."
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "Optional due date (ISO 8601). Past-due open reviews are nudged, then expire."
+          },
+          "policy": {
+            "description": "Completion policy (omit for the platform defaults).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ReviewPolicyDto"
+              }
+            ]
+          },
+          "participants": {
+            "description": "Participants to invite (members and/or externals).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParticipantInputDto"
+            }
+          }
+        },
+        "required": [
+          "documentId"
+        ]
+      },
+      "AddParticipantDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "A member's user id (mutually exclusive with externalEmail)."
+          },
+          "externalEmail": {
+            "type": "string",
+            "description": "An external reviewer's email (mutually exclusive with userId)."
+          },
+          "externalName": {
+            "type": "string",
+            "description": "Display name for an external reviewer."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "reviewer",
+              "approver",
+              "observer"
+            ],
+            "description": "Participant role: reviewer (default), approver, or observer."
+          }
+        }
+      },
+      "ApprovalDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "approved_with_comments"
+            ],
+            "description": "The decision: approved, rejected, or approved_with_comments."
+          },
+          "note": {
+            "type": "string",
+            "description": "An optional note recorded with the decision."
+          },
+          "approverUserId": {
+            "type": "string",
+            "description": "Optionally attribute the decision to a member who is a named approver on this review. When omitted, the decision is recorded as an integration approval authorized by the key's review scope."
+          }
+        },
+        "required": [
+          "decision"
+        ]
+      },
+      "ShareLinkPermissionsDto": {
+        "type": "object",
+        "properties": {
+          "canView": {
+            "type": "boolean",
+            "description": "May view the document (always granted; a link that shows nothing is meaningless)."
+          },
+          "canComment": {
+            "type": "boolean",
+            "description": "May create + reply to external comments (default false)."
+          },
+          "canDownload": {
+            "type": "boolean",
+            "description": "May download the PDF; when false the bytes are view-only streamed (default false)."
+          },
+          "canApprove": {
+            "type": "boolean",
+            "description": "May record an approval decision on a shared review request (default false)."
+          },
+          "requireEmail": {
+            "type": "boolean",
+            "description": "Require an email (not just a name) before the external reviewer can interact (default false)."
+          },
+          "allowedDomains": {
+            "description": "Restrict the email gate to these domains (e.g. [\"acme.com\"]); empty ⇒ any domain.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CreateShareLinkDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "render",
+              "reviewRequest"
+            ],
+            "description": "What the link grants access to."
+          },
+          "documentId": {
+            "type": "string",
+            "description": "The document to share (required when targetType = render).",
+            "example": "doc_abc123"
+          },
+          "reviewRequestId": {
+            "type": "string",
+            "description": "The review request to share (required when targetType = reviewRequest).",
+            "example": "rev_abc123"
+          },
+          "permissions": {
+            "description": "Capability grants for the external actor.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShareLinkPermissionsDto"
+              }
+            ]
+          },
+          "password": {
+            "type": "string",
+            "description": "Optional password gate (6–128 chars); stored scrypt-hashed."
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Optional expiry (ISO 8601). Refused at open time; the sweeper hard-disables past it."
+          }
+        },
+        "required": [
+          "targetType"
+        ]
       }
     }
   }

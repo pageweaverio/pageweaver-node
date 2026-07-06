@@ -13,6 +13,9 @@ export {
 export { TemplatesResource } from "./templates";
 export { SchemasResource } from "./schemas";
 export { UsageResource } from "./usage";
+export { CommentsResource } from "./comments";
+export { ReviewsResource } from "./reviews";
+export { ShareLinksResource } from "./shareLinks";
 
 export {
   PageWeaverError,
@@ -63,6 +66,7 @@ export type {
   DownloadInfo,
   Document,
   DocumentIntegrity,
+  DocumentReviewSummary,
   DocumentVerification,
   DocumentListItem,
   ListDocumentsParams,
@@ -74,4 +78,44 @@ export type {
   Schema,
   SchemaVersionSummary,
   Usage,
+  // Review layer
+  AnchorType,
+  ThreadStatus,
+  CommentSeverity,
+  CommentVisibility,
+  MigrationStatus,
+  Mention,
+  CreateCommentParams,
+  UpdateCommentParams,
+  ReplyParams,
+  CommentMessage,
+  CommentThread,
+  CommentThreadPage,
+  ListCommentsParams,
+  ReviewStatus,
+  ParticipantRole,
+  ParticipantStatus,
+  ApprovalDecision,
+  ReviewPolicy,
+  ParticipantInput,
+  CreateReviewParams,
+  AddParticipantParams,
+  ApprovalParams,
+  ReviewParticipant,
+  Approval,
+  ReviewPolicyState,
+  ReviewRequest,
+  ReviewPage,
+  ListReviewsParams,
+  ShareLinkTargetType,
+  ShareLinkPermissions,
+  CreateShareLinkParams,
+  ShareLink,
+  CreatedShareLink,
+  ShareLinkList,
+  ListShareLinksParams,
+  DocumentPageInfo,
+  MigrateCommentsParams,
+  MigrateCommentsResult,
+  CommentMigrationRollup,
 } from "./types";
