@@ -2009,7 +2009,7 @@
           },
           "printBackground": {
             "type": "boolean",
-            "description": "Print background graphics/colours."
+            "description": "Print background graphics/colors."
           },
           "omitBackground": {
             "type": "boolean",
@@ -2021,7 +2021,7 @@
           },
           "preferCssPageSize": {
             "type": "boolean",
-            "description": "Honour the document's CSS @page size over API paper params."
+            "description": "Honor the document's CSS @page size over API paper params."
           },
           "pageRanges": {
             "type": "string",
@@ -2082,7 +2082,7 @@
           "color": {
             "type": "string",
             "example": "#666666",
-            "description": "Band text colour (hex or CSS name)."
+            "description": "Band text color (hex or CSS name)."
           }
         }
       },
@@ -2106,7 +2106,7 @@
           "color": {
             "type": "string",
             "example": "#cccccc",
-            "description": "Colour (hex or CSS name)."
+            "description": "Color (hex or CSS name)."
           },
           "opacity": {
             "type": "number",

@@ -65,7 +65,7 @@ export class ReviewsResource {
     });
   }
 
-  /** Withdraw a review (open → cancelled). */
+  /** Withdraw a review (open → canceled). */
   cancel(id: string, signal?: AbortSignal): Promise<ReviewRequest> {
     return this.http.json<ReviewRequest>("POST", `/v1/reviews/${encodeURIComponent(id)}/cancel`, {
       signal,

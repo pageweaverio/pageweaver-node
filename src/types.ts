@@ -26,13 +26,13 @@ export interface PageOptions {
 export interface RenderingOptions {
   /** CSS media type Chromium emulates. */
   media?: "screen" | "print";
-  /** Print background graphics/colours. */
+  /** Print background graphics/colors. */
   printBackground?: boolean;
   /** Transparent background (implies printBackground). */
   omitBackground?: boolean;
   /** Collapse the whole document onto one tall page. */
   singlePage?: boolean;
-  /** Honour the document's CSS @page size over the API paper params. */
+  /** Honor the document's CSS @page size over the API paper params. */
   preferCssPageSize?: boolean;
   /** Pages to print, e.g. "1-3,5". Empty means all. */
   pageRanges?: string;
@@ -56,7 +56,7 @@ export interface BandOptions {
   center?: string;
   right?: string;
   fontSizePt?: number;
-  /** Hex or CSS colour name. */
+  /** Hex or CSS color name. */
   color?: string;
 }
 
@@ -588,7 +588,7 @@ export interface ListCommentsParams {
   limit?: number;
 }
 
-export type ReviewStatus = "open" | "completed" | "cancelled" | "expired" | "superseded";
+export type ReviewStatus = "open" | "completed" | "canceled" | "expired" | "superseded";
 export type ParticipantRole = "reviewer" | "approver" | "observer";
 export type ParticipantStatus = "pending" | "viewed" | "commented" | "completed" | "declined";
 export type ApprovalDecision = "approved" | "rejected" | "approved_with_comments";
