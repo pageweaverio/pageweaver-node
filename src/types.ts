@@ -212,6 +212,12 @@ export interface CreateFromTemplateParams extends CreateDocumentCommon {
   payload: Record<string, unknown>;
   /** Pin a published template version; defaults to the template's latest. */
   version?: number;
+  /**
+   * Render the version this template is pinned to in the named environment (e.g. "production")
+   * instead of a numeric `version`. Mutually exclusive with `version`; fails if the template has no
+   * pin in that environment (no silent fallback).
+   */
+  environment?: string;
   /** Validate against this schema instead of the one the template pins (account-owned). */
   schemaId?: string;
   /** Pin a published schema version (requires `schemaId`); defaults to that schema's latest. */
@@ -763,4 +769,198 @@ export interface CommentMigrationRollup {
   resolved_by_change: number;
   needs_relocation: number;
   failed: number;
+}
+
+// ── Template proposals (Pillar 2) ───────────────────────────────────────────────
+
+/** A proposal's lifecycle state. */
+export type ProposalStatus = "open" | "approved" | "promoted" | "rejected" | "superseded";
+
+/** The render-diff regression's progress for a proposal. */
+export type ProposalCheckStatus = "pending" | "running" | "completed" | "failed";
+
+/** Line-level diff magnitude of two text blobs (added / removed lines). */
+export interface ProposalTextDiffStats {
+  added: number;
+  removed: number;
+}
+
+/** One dataset's verdict on the render-diff regression: `pass` (unchanged), `changed`, or `error`. */
+export type ProposalDatasetResult = "pass" | "changed" | "error";
+
+/** A per-dataset outcome inside {@link ProposalCheckSummary}. */
+export interface ProposalDatasetCheck {
+  datasetId: string;
+  datasetName: string;
+  result: ProposalDatasetResult;
+  /** Present on `error`: a stable machine code (`render_failed` / `budget_exhausted` / `base_missing`). */
+  errorCode?: string;
+  /** base → candidate page-count change (candidate - base); null on error. */
+  pageCountDelta: number | null;
+  basePages: number | null;
+  candidatePages: number | null;
+  /** True only when the two outputs hashed byte-identical (a strong "unchanged" signal); null on error. */
+  hashEqual: boolean | null;
+  /** Extracted-text line diff across all pages; null on error. */
+  textDiffStats: ProposalTextDiffStats | null;
+  /** Signed-URL-servable storage keys for the evidence; null once swept (30d after terminal). */
+  artifactKeys: { candidate: string; base: string; diff: string } | null;
+}
+
+/** Line diff of the compiled artifact panes (computed once per proposal, not per dataset). */
+export interface ProposalArtifactDiff {
+  html: ProposalTextDiffStats;
+  css: ProposalTextDiffStats;
+  payloadSchema: ProposalTextDiffStats;
+  /** True when any pane differs — the "the design itself changed" signal, independent of render output. */
+  changed: boolean;
+}
+
+/** The durable `TemplateProposal.checkSummary` roll-up. */
+export interface ProposalCheckSummary {
+  version: 1;
+  /** "none" = the template's schema has zero valid datasets → no regression coverage. */
+  coverage: "covered" | "none";
+  /** Every rendered dataset is `pass` (and at least one ran) → the reviewer's fast-approve signal. */
+  noOutputChange: boolean;
+  totals: { datasets: number; pass: number; changed: number; error: number };
+  artifactDiff: ProposalArtifactDiff;
+  datasets: ProposalDatasetCheck[];
+  ranAt: string;
+}
+
+/** One append-only approve/reject decision on a proposal. */
+export interface ProposalApproval {
+  id: string;
+  decision: string;
+  note: string | null;
+  approverUserId: string | null;
+  createdAt: string;
+}
+
+/** The promote-gate snapshot returned with a proposal detail. */
+export interface ProposalGate {
+  active: boolean;
+  requiredApprovals: number;
+  distinctApprovers: number;
+  openBlockingThreads: number;
+  blockingPolicyActive: boolean;
+  promotable: boolean;
+  blockReason: string | null;
+}
+
+/** A template change proposal (the PR analog): a frozen candidate reviewed before it is promoted. */
+export interface TemplateProposal {
+  id: string;
+  templateId: string;
+  status: ProposalStatus;
+  checkStatus: ProposalCheckStatus;
+  baseVersion: number;
+  note: string | null;
+  editorMode: string;
+  authorUserId: string | null;
+  promotedVersion: number | null;
+  checkSummary?: ProposalCheckSummary | null;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  /** Present on a detail fetch. */
+  approvals?: ProposalApproval[];
+  /** Present on a detail fetch. */
+  gate?: ProposalGate;
+}
+
+/** Body of `POST /v1/templates/:id/proposals`. */
+export interface OpenProposalParams {
+  /** Freeze the template's current saved draft as the candidate (ignores inline html/css). */
+  fromDraft?: boolean;
+  /** Candidate template HTML (compiled Liquid). Required unless `fromDraft`. */
+  html?: string;
+  /** Candidate CSS. */
+  css?: string;
+  /** Example payload; used to infer the JSON Schema when `payloadSchema` is omitted. */
+  payload?: Record<string, unknown>;
+  /** The candidate payload JSON Schema. Inferred from `payload` when omitted. */
+  payloadSchema?: Record<string, unknown>;
+  /** Authoring mode of the candidate (default `code`). */
+  editorMode?: "code" | "visual";
+  /** Lossless re-editable restore source (visual mode). Omit for code mode. */
+  editorSource?: Record<string, unknown>;
+  /** Frozen Gotenberg render settings for the candidate version. */
+  renderSettings?: Record<string, unknown>;
+  /** A short "what changed" note shown in history at promote (max 200 chars). */
+  note?: string;
+}
+
+export interface ListProposalsParams {
+  status?: ProposalStatus;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface ProposalPage {
+  items: TemplateProposal[];
+  nextCursor: string | null;
+}
+
+/** Body of the approve / reject endpoints. */
+export interface ProposalDecisionParams {
+  /** An optional note recorded with the decision (required on reject in the portal; max 1000 chars). */
+  note?: string;
+  /** Attribute the decision to a named approver on a review targeting this proposal. */
+  approverUserId?: string;
+}
+
+/** `POST …/promote` result. */
+export interface PromoteProposalResult {
+  promotedVersion: number;
+}
+
+// ── Environments & pins (Pillar 2) ──────────────────────────────────────────────
+
+/** A named per-account pointer set over immutable template versions. */
+export interface Environment {
+  id: string;
+  name: string;
+  slug: string;
+  isProduction: boolean;
+  pinCount: number;
+  createdAt: string;
+}
+
+/** One template → published-version pointer in an environment. */
+export interface EnvironmentPin {
+  templateId: string;
+  version: number;
+  updatedByUserId: string | null;
+  deploymentId: string | null;
+  updatedAt: string;
+}
+
+/** Body of `POST /v1/environments`. */
+export interface CreateEnvironmentParams {
+  name: string;
+  /** Lowercase letters, digits, and single hyphens; the render-time selector, unique per account. */
+  slug: string;
+  isProduction?: boolean;
+}
+
+/** Body of `PATCH /v1/environments/:slug`. The slug is immutable. */
+export interface UpdateEnvironmentParams {
+  name?: string;
+  isProduction?: boolean;
+}
+
+/** Body of `POST /v1/environments/:slug/promote`. */
+export interface PromotePinsParams {
+  /** Source environment slug to copy pins from. */
+  from: string;
+  /** Only promote these template ids. Omit to promote every pin in the source. */
+  templates?: string[];
+}
+
+/** `POST …/promote` result: how many pins moved plus the resulting pins. */
+export interface PromotePinsResult {
+  promoted: number;
+  pins: EnvironmentPin[];
 }

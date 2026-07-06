@@ -440,3 +440,138 @@ test("documents.pages + migrateComments hit the document sub-paths", async () =>
   assert.equal(calls[1]?.url, "http://api.test/v1/documents/doc_2/migrate-comments");
   assert.deepEqual(calls[1]?.body, { fromDocumentId: "doc_1" });
 });
+
+// ── Template proposals (Pillar 2, V2-B06) ────────────────────────────────────────
+
+test("templates.proposals.open posts the candidate body under the template", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "prop_1", templateId: "tmpl_x", status: "open", checkStatus: "pending", baseVersion: 7 }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const prop = await pw.templates.proposals.open("tmpl_x", { fromDraft: true, note: "tweak footer" });
+
+  assert.equal(prop.id, "prop_1");
+  assert.equal(prop.status, "open");
+  assert.equal(prop.checkStatus, "pending");
+  const call = calls[0];
+  assert.equal(call?.url, "http://api.test/v1/templates/tmpl_x/proposals");
+  assert.equal(call?.method, "POST");
+  assert.equal(call?.headers["x-api-key"], "pk_test_abc");
+  assert.deepEqual(call?.body, { fromDraft: true, note: "tweak footer" });
+});
+
+test("templates.proposals.list forwards status + cursor as query", async () => {
+  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const page = await pw.templates.proposals.list("tmpl_x", { status: "open", limit: 10 });
+
+  assert.deepEqual(page.items, []);
+  assert.equal(page.nextCursor, null);
+  assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_x/proposals?status=open&limit=10");
+});
+
+test("templates.proposals.get / rerunChecks / approve / reject / promote / retract hit the right sub-paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { id: "prop_1", status: "open", gate: { promotable: false, blockReason: "approvals 0/2" } }),
+    json(202, { id: "prop_1", checkStatus: "pending" }),
+    json(201, { id: "prop_1", status: "open" }),
+    json(201, { id: "prop_1", status: "rejected" }),
+    json(200, { promotedVersion: 8 }),
+    json(200, { ok: true }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const got = await pw.templates.proposals.get("tmpl_x", "prop_1");
+  assert.equal(got.gate?.promotable, false);
+  assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1");
+
+  await pw.templates.proposals.rerunChecks("tmpl_x", "prop_1");
+  assert.equal(calls[1]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/checks");
+  assert.equal(calls[1]?.method, "POST");
+
+  await pw.templates.proposals.approve("tmpl_x", "prop_1", { approverUserId: "usr_2" });
+  assert.equal(calls[2]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/approve");
+  assert.deepEqual(calls[2]?.body, { approverUserId: "usr_2" });
+
+  await pw.templates.proposals.reject("tmpl_x", "prop_1", { note: "not yet" });
+  assert.equal(calls[3]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/reject");
+
+  const promoted = await pw.templates.proposals.promote("tmpl_x", "prop_1");
+  assert.equal(promoted.promotedVersion, 8);
+  assert.equal(calls[4]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/promote");
+
+  const retracted = await pw.templates.proposals.retract("tmpl_x", "prop_1");
+  assert.equal(retracted.ok, true);
+  assert.equal(calls[5]?.method, "DELETE");
+  assert.equal(calls[5]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1");
+});
+
+// ── Environments & pins (Pillar 2, V2-B06) ───────────────────────────────────────
+
+test("environments.list / create / get / update / delete hit /v1/environments", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, [{ id: "env_1", name: "Production", slug: "production", isProduction: true, pinCount: 2 }]),
+    json(201, { id: "env_2", name: "Staging", slug: "staging", isProduction: false, pinCount: 0 }),
+    json(200, { id: "env_2", name: "Staging", slug: "staging", isProduction: false, pinCount: 0 }),
+    json(200, { id: "env_2", name: "Stage", slug: "staging", isProduction: false, pinCount: 0 }),
+    json(200, { deleted: true }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const envs = await pw.environments.list();
+  assert.equal(envs[0]?.slug, "production");
+  assert.equal(calls[0]?.url, "http://api.test/v1/environments");
+
+  await pw.environments.create({ name: "Staging", slug: "staging" });
+  assert.equal(calls[1]?.method, "POST");
+  assert.deepEqual(calls[1]?.body, { name: "Staging", slug: "staging" });
+
+  await pw.environments.get("staging");
+  assert.equal(calls[2]?.url, "http://api.test/v1/environments/staging");
+
+  await pw.environments.update("staging", { name: "Stage" });
+  assert.equal(calls[3]?.method, "PATCH");
+
+  const del = await pw.environments.delete("staging");
+  assert.equal(del.deleted, true);
+  assert.equal(calls[4]?.method, "DELETE");
+});
+
+test("environments.pins / setPin / removePin / promote hit the pin sub-paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, [{ templateId: "tmpl_x", version: 7, updatedByUserId: null, deploymentId: null, updatedAt: "t" }]),
+    json(200, { templateId: "tmpl_x", version: 8, updatedByUserId: "usr_1", deploymentId: null, updatedAt: "t" }),
+    json(200, { deleted: true }),
+    json(200, { promoted: 2, pins: [] }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const pins = await pw.environments.pins("production");
+  assert.equal(pins[0]?.version, 7);
+  assert.equal(calls[0]?.url, "http://api.test/v1/environments/production/pins");
+
+  const pin = await pw.environments.setPin("production", "tmpl_x", 8);
+  assert.equal(pin.version, 8);
+  assert.equal(calls[1]?.method, "PUT");
+  assert.equal(calls[1]?.url, "http://api.test/v1/environments/production/pins/tmpl_x");
+  assert.deepEqual(calls[1]?.body, { version: 8 });
+
+  await pw.environments.removePin("production", "tmpl_x");
+  assert.equal(calls[2]?.method, "DELETE");
+
+  const res = await pw.environments.promote("production", { from: "staging", templates: ["tmpl_x"] });
+  assert.equal(res.promoted, 2);
+  assert.equal(calls[3]?.url, "http://api.test/v1/environments/production/promote");
+  assert.deepEqual(calls[3]?.body, { from: "staging", templates: ["tmpl_x"] });
+});
+
+test("documents.create accepts an environment selector in the body", async () => {
+  const { fetch, calls } = mockFetch([json(202, { id: "doc_9", status: "queued", version: 7 })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.documents.create({ templateId: "tmpl_x", payload: { total: 1 }, environment: "production" });
+
+  assert.deepEqual(calls[0]?.body, { templateId: "tmpl_x", payload: { total: 1 }, environment: "production" });
+});

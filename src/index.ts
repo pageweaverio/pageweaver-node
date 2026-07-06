@@ -11,11 +11,13 @@ export {
   type CreateSyncOptions,
 } from "./documents";
 export { TemplatesResource } from "./templates";
+export { ProposalsResource } from "./proposals";
 export { SchemasResource } from "./schemas";
 export { UsageResource } from "./usage";
 export { CommentsResource } from "./comments";
 export { ReviewsResource } from "./reviews";
 export { ShareLinksResource } from "./shareLinks";
+export { EnvironmentsResource } from "./environments";
 
 export {
   PageWeaverError,
@@ -118,4 +120,27 @@ export type {
   MigrateCommentsParams,
   MigrateCommentsResult,
   CommentMigrationRollup,
+  // Template proposals (Pillar 2)
+  ProposalStatus,
+  ProposalCheckStatus,
+  ProposalTextDiffStats,
+  ProposalDatasetResult,
+  ProposalDatasetCheck,
+  ProposalArtifactDiff,
+  ProposalCheckSummary,
+  ProposalApproval,
+  ProposalGate,
+  TemplateProposal,
+  OpenProposalParams,
+  ListProposalsParams,
+  ProposalPage,
+  ProposalDecisionParams,
+  PromoteProposalResult,
+  // Environments & pins (Pillar 2)
+  Environment,
+  EnvironmentPin,
+  CreateEnvironmentParams,
+  UpdateEnvironmentParams,
+  PromotePinsParams,
+  PromotePinsResult,
 } from "./types";

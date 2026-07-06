@@ -6,6 +6,7 @@ import { UsageResource } from "./usage";
 import { CommentsResource } from "./comments";
 import { ReviewsResource } from "./reviews";
 import { ShareLinksResource } from "./shareLinks";
+import { EnvironmentsResource } from "./environments";
 
 export interface PageWeaverOptions {
   /** Your secret API key: `pk_live_...` in production, `pk_test_...` in development. */
@@ -41,6 +42,8 @@ export class PageWeaver {
   readonly reviews: ReviewsResource;
   /** Capability-scoped external share links (requires a `review`-scoped key). */
   readonly shareLinks: ShareLinksResource;
+  /** Named per-account environments + pins over template versions (requires a `deploy`-scoped key for writes). */
+  readonly environments: EnvironmentsResource;
 
   constructor(options: PageWeaverOptions) {
     const http = new HttpClient(options);
@@ -51,5 +54,6 @@ export class PageWeaver {
     this.comments = new CommentsResource(http);
     this.reviews = new ReviewsResource(http);
     this.shareLinks = new ShareLinksResource(http);
+    this.environments = new EnvironmentsResource(http);
   }
 }

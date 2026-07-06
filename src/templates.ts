@@ -1,9 +1,15 @@
 import type { HttpClient } from "./http";
+import { ProposalsResource } from "./proposals";
 import type { Template, TemplateSummary, TemplateVersionSummary } from "./types";
 
 /** Read-only discovery of your published templates and their pinnable versions. */
 export class TemplatesResource {
-  constructor(private readonly http: HttpClient) {}
+  /** Template change proposals — the PR analog for template changes (requires a `deploy`-scoped key). */
+  readonly proposals: ProposalsResource;
+
+  constructor(private readonly http: HttpClient) {
+    this.proposals = new ProposalsResource(http);
+  }
 
   /** All templates owned by the key's account, newest-updated first. */
   list(signal?: AbortSignal): Promise<TemplateSummary[]> {

@@ -1225,6 +1225,643 @@
           "share-links"
         ]
       }
+    },
+    "/v1/templates/{id}/proposals": {
+      "post": {
+        "description": "Freeze a candidate template change (inline `html`/`css`/`payloadSchema`, or `fromDraft: true` to use the saved draft). No new version is created and the current version does not advance. Returns 202 with the proposal; render-diff checks run asynchronously.",
+        "operationId": "ProposalsController_open",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenProposalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Open a proposal",
+        "tags": [
+          "proposals"
+        ]
+      },
+      "get": {
+        "description": "Filter by ?status=; cursor paginated (newest first).",
+        "operationId": "ProposalsController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List proposals",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/v1/templates/{id}/proposals/{proposalId}": {
+      "get": {
+        "description": "The proposal with its status, check status/summary, append-only approvals, and promote-gate state.",
+        "operationId": "ProposalsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a proposal",
+        "tags": [
+          "proposals"
+        ]
+      },
+      "delete": {
+        "description": "Withdraw an open proposal (only while open). The live version is untouched.",
+        "operationId": "ProposalsController_retract",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Retract a proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/v1/templates/{id}/proposals/{proposalId}/checks": {
+      "post": {
+        "description": "Re-run the render-diff regression (candidate vs. the live version, per saved dataset) and overwrite the check summary. Only while the proposal is open. Byte-identical output is reported when it occurs, but is never claimed as the test (rendered output is not byte-reproducible).",
+        "operationId": "ProposalsController_runChecks",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Re-run proposal checks",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/v1/templates/{id}/proposals/{proposalId}/approve": {
+      "post": {
+        "description": "Append an approval decision. Attribute it to a named approver via `approverUserId`, or omit it for an integration approval. The proposal author can never approve their own proposal.",
+        "operationId": "ProposalsController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Approve a proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/v1/templates/{id}/proposals/{proposalId}/reject": {
+      "post": {
+        "description": "Append a rejection decision and move the proposal to the rejected terminal state.",
+        "operationId": "ProposalsController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalDecisionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Reject a proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/v1/templates/{id}/proposals/{proposalId}/promote": {
+      "post": {
+        "description": "Publish the candidate as the next version through the serialized, gate-checked publish. Returns 409 when the approval gate is unmet, blocking comments are open, or the base version moved (the proposal is then superseded). Idempotent for an already-promoted proposal.",
+        "operationId": "ProposalsController_promote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "proposalId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Promote a proposal",
+        "tags": [
+          "proposals"
+        ]
+      }
+    },
+    "/v1/environments": {
+      "get": {
+        "description": "Every environment for the account, with pin counts.",
+        "operationId": "EnvironmentsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List environments",
+        "tags": [
+          "environments"
+        ]
+      },
+      "post": {
+        "description": "Create a named pointer set (e.g. staging / production). Slug is the render-time selector.",
+        "operationId": "EnvironmentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnvironmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create an environment",
+        "tags": [
+          "environments"
+        ]
+      }
+    },
+    "/v1/environments/{slug}": {
+      "get": {
+        "operationId": "EnvironmentsController_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get an environment",
+        "tags": [
+          "environments"
+        ]
+      },
+      "patch": {
+        "description": "Rename or change the production flag. The slug is immutable.",
+        "operationId": "EnvironmentsController_update",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEnvironmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update an environment",
+        "tags": [
+          "environments"
+        ]
+      },
+      "delete": {
+        "description": "Deletes the environment and its pins (audited).",
+        "operationId": "EnvironmentsController_remove",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Delete an environment",
+        "tags": [
+          "environments"
+        ]
+      }
+    },
+    "/v1/environments/{slug}/pins": {
+      "get": {
+        "description": "The template → version pointers in this environment.",
+        "operationId": "EnvironmentsController_listPins",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List pins",
+        "tags": [
+          "environments"
+        ]
+      }
+    },
+    "/v1/environments/{slug}/pins/{templateId}": {
+      "put": {
+        "description": "Point a template at one of its published versions in this environment (creates or moves the pin).",
+        "operationId": "EnvironmentsController_setPin",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPinDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Set a pin",
+        "tags": [
+          "environments"
+        ]
+      },
+      "delete": {
+        "description": "Unpin a template from this environment.",
+        "operationId": "EnvironmentsController_removePin",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Remove a pin",
+        "tags": [
+          "environments"
+        ]
+      }
+    },
+    "/v1/environments/{slug}/promote": {
+      "post": {
+        "description": "Copy another environment's pin set onto this one (e.g. staging → production). Pass `templates` to partial-promote. Version history is never touched — only pointers move.",
+        "operationId": "EnvironmentsController_promote",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotePinsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Promote pins",
+        "tags": [
+          "environments"
+        ]
+      }
     }
   },
   "info": {
@@ -1788,6 +2425,11 @@
             "description": "Pin a published TEMPLATE version; defaults to the template's latest.",
             "minimum": 1
           },
+          "environment": {
+            "type": "string",
+            "description": "Render the version this template is pinned to in the named environment (e.g. 'production'), instead of a numeric `version`. Mutually exclusive with `version`. Fails with 409 if the template has no pin in that environment (no silent fallback). Requires a `templateId`.",
+            "example": "production"
+          },
           "schemaId": {
             "type": "string",
             "description": "Validate the payload against THIS schema instead of the one the template pins. Omit to use the template's pinned schema. The key's account must own the schema.",
@@ -2276,6 +2918,133 @@
         },
         "required": [
           "targetType"
+        ]
+      },
+      "OpenProposalDto": {
+        "type": "object",
+        "properties": {
+          "fromDraft": {
+            "type": "boolean",
+            "description": "Freeze the template's current saved draft as the candidate (ignores the inline html/css)."
+          },
+          "html": {
+            "type": "string",
+            "description": "Candidate template HTML (compiled Liquid). Required unless fromDraft."
+          },
+          "css": {
+            "type": "string",
+            "description": "Candidate CSS."
+          },
+          "payload": {
+            "type": "object",
+            "description": "Example payload; used to infer the JSON Schema when payloadSchema is omitted."
+          },
+          "payloadSchema": {
+            "type": "object",
+            "description": "The candidate payload JSON Schema (the API contract). Inferred from payload when omitted."
+          },
+          "editorMode": {
+            "type": "string",
+            "enum": [
+              "code",
+              "visual"
+            ],
+            "description": "Authoring mode of the candidate (default code)."
+          },
+          "editorSource": {
+            "type": "object",
+            "description": "Lossless re-editable restore source (visual mode). Omit for code mode."
+          },
+          "renderSettings": {
+            "type": "object",
+            "description": "Frozen Gotenberg render settings for the candidate version."
+          },
+          "note": {
+            "type": "string",
+            "description": "A short 'what changed' note, shown in history at promote (max 200)."
+          }
+        }
+      },
+      "ProposalDecisionDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "An optional note recorded with the decision (max 1000)."
+          },
+          "approverUserId": {
+            "type": "string",
+            "description": "Attribute the decision to a member who is a named approver on a review targeting this proposal. When omitted, the decision is an integration decision authorized by the key's deploy scope."
+          }
+        }
+      },
+      "CreateEnvironmentDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Production",
+            "description": "Display name."
+          },
+          "slug": {
+            "type": "string",
+            "example": "production",
+            "description": "Stable API handle used as the render-time `environment` selector. Unique per account."
+          },
+          "isProduction": {
+            "type": "boolean",
+            "description": "Mark this the production environment (pins here get the approval-gated deploy treatment)."
+          }
+        },
+        "required": [
+          "name",
+          "slug"
+        ]
+      },
+      "UpdateEnvironmentDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New display name."
+          },
+          "isProduction": {
+            "type": "boolean",
+            "description": "Whether this is the production environment."
+          }
+        }
+      },
+      "SetPinDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The published template version this environment points at."
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "PromotePinsDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "staging",
+            "description": "Source environment slug to copy pins from."
+          },
+          "templates": {
+            "description": "Only promote these template ids. Omit to promote every pin in the source environment.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "from"
         ]
       }
     }

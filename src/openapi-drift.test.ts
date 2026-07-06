@@ -59,6 +59,25 @@ const EXPECTED_ENDPOINTS: string[] = [
   "post /v1/share-links",
   "get /v1/share-links",
   "post /v1/share-links/{id}/disable",
+  // Template proposals (Pillar 2, V2-B06).
+  "post /v1/templates/{id}/proposals",
+  "get /v1/templates/{id}/proposals",
+  "get /v1/templates/{id}/proposals/{proposalId}",
+  "post /v1/templates/{id}/proposals/{proposalId}/checks",
+  "post /v1/templates/{id}/proposals/{proposalId}/approve",
+  "post /v1/templates/{id}/proposals/{proposalId}/reject",
+  "post /v1/templates/{id}/proposals/{proposalId}/promote",
+  "delete /v1/templates/{id}/proposals/{proposalId}",
+  // Environments & pins (Pillar 2, V2-B06).
+  "get /v1/environments",
+  "post /v1/environments",
+  "get /v1/environments/{slug}",
+  "patch /v1/environments/{slug}",
+  "delete /v1/environments/{slug}",
+  "get /v1/environments/{slug}/pins",
+  "put /v1/environments/{slug}/pins/{templateId}",
+  "delete /v1/environments/{slug}/pins/{templateId}",
+  "post /v1/environments/{slug}/promote",
 ];
 
 /**
@@ -78,6 +97,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "version",
     "schemaId",
     "schemaVersion",
+    "environment",
     "idempotencyKey",
     "callbackUrl",
     "options",
@@ -151,6 +171,23 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   ApprovalDto: ["decision", "note", "approverUserId"],
   ShareLinkPermissionsDto: ["canView", "canComment", "canDownload", "canApprove", "requireEmail", "allowedDomains"],
   CreateShareLinkDto: ["targetType", "documentId", "reviewRequestId", "permissions", "password", "expiresAt"],
+  // Template proposals + environments request DTOs (Pillar 2, V2-B06).
+  OpenProposalDto: [
+    "fromDraft",
+    "html",
+    "css",
+    "payload",
+    "payloadSchema",
+    "editorMode",
+    "editorSource",
+    "renderSettings",
+    "note",
+  ],
+  ProposalDecisionDto: ["note", "approverUserId"],
+  CreateEnvironmentDto: ["name", "slug", "isProduction"],
+  UpdateEnvironmentDto: ["name", "isProduction"],
+  SetPinDto: ["version"],
+  PromotePinsDto: ["from", "templates"],
 };
 
 test("openapi drift: the SDK covers exactly the public endpoint set", () => {
