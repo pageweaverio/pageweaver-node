@@ -471,6 +471,8 @@ export interface Usage {
   /** Editor PDF-preview pages consumed this period (a separate budget). */
   previewPages: number;
   previewLimit: number;
+  /** The calling API key's capability scopes (e.g. `["read","render","deploy"]`). */
+  scopes: string[];
 }
 
 // ─── Review layer: comments, reviews, approvals, share links ────────────────────
