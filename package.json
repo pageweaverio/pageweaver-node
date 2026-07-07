@@ -41,7 +41,8 @@
     "lint": "eslint src",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "sync:openapi": "node scripts/sync-openapi.mjs",
-    "prepublishOnly": "pnpm run build"
+    "prepare": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
