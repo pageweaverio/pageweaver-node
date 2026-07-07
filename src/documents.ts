@@ -10,6 +10,7 @@ import type {
   DocumentPageInfo,
   DocumentStatus,
   DocumentVerification,
+  ProvenanceReceipt,
   ListDocumentsParams,
   MigrateCommentsParams,
   MigrateCommentsResult,
@@ -82,6 +83,20 @@ export class DocumentsResource {
     return this.http.json<DocumentVerification>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/verify`,
+      { signal },
+    );
+  }
+
+  /**
+   * Export a signed provenance receipt for a completed document: an HMAC-signed bundle binding the file
+   * to the request that produced it (`requestHash`), the pinned template version (`artifactHash`), the
+   * triggering identity, the issue time, and the content hash + chain link. Verify it offline against
+   * the published key. Requires a plan with the provenance-receipt capability.
+   */
+  receipt(id: string, signal?: AbortSignal): Promise<ProvenanceReceipt> {
+    return this.http.json<ProvenanceReceipt>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/receipt`,
       { signal },
     );
   }

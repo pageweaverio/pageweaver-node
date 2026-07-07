@@ -8,6 +8,7 @@ import { ReviewsResource } from "./reviews";
 import { ShareLinksResource } from "./shareLinks";
 import { EnvironmentsResource } from "./environments";
 import { DeploymentsResource } from "./deployments";
+import { LivingDocumentsResource } from "./livingDocuments";
 
 export interface PageWeaverOptions {
   /** Your secret API key: `pk_live_...` in production, `pk_test_...` in development. */
@@ -47,6 +48,8 @@ export class PageWeaver {
   readonly environments: EnvironmentsResource;
   /** Plan documents-as-code deployments from a manifest (requires a `deploy`-scoped key for writes). */
   readonly deployments: DeploymentsResource;
+  /** Living documents (F04): a stable identity + permanent alias, reissued over time. */
+  readonly livingDocuments: LivingDocumentsResource;
 
   constructor(options: PageWeaverOptions) {
     const http = new HttpClient(options);
@@ -59,5 +62,6 @@ export class PageWeaver {
     this.shareLinks = new ShareLinksResource(http);
     this.environments = new EnvironmentsResource(http);
     this.deployments = new DeploymentsResource(http);
+    this.livingDocuments = new LivingDocumentsResource(http);
   }
 }

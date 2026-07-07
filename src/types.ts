@@ -306,6 +306,8 @@ export interface DocumentIntegrity {
   chainSeq: number | null;
   /** Digital-signature status; null when the document is unsigned. */
   signature?: DocumentSignature | null;
+  /** Whether a signed provenance receipt can be exported for this document (`documents.receipt`). */
+  receiptAvailable?: boolean;
 }
 
 /** A document's PAdES digital-signature status; null when the document is unsigned. */
@@ -431,6 +433,147 @@ export interface TemplateVersionSummary {
   /** ISO 8601 timestamp. */
   publishedAt: string;
   derivedFromVersion: number | null;
+  /** SHA-256 of the frozen compiled artifact (D92); null for a pre-integrity version. */
+  artifactHash: string | null;
+  /** True when this is the template's current published version. */
+  isCurrent: boolean;
+  /** True once a newer version has superseded this one. */
+  isSuperseded: boolean;
+}
+
+/**
+ * A frozen-version attestation (`templates.attest`): an exportable change-control receipt for one
+ * published template version. Proves an internal control trail (which version, that it is immutable,
+ * when, by whom), NOT a legally-trusted digital signature.
+ */
+export interface VersionAttestation {
+  templateId: string;
+  version: number;
+  /** SHA-256 of the frozen compiled artifact (64-hex). */
+  artifactHash: string;
+  prevArtifactHash: string | null;
+  /** Whether the artifact recomputes to its stored hash and links to its predecessor. */
+  chainVerified: boolean;
+  hashAlg: string;
+  /** ISO 8601 timestamp. */
+  publishedAt: string;
+  publishedBy: string | null;
+  schemaVersion: number | null;
+  isCurrent: boolean;
+}
+
+/** Who triggered a render, carried in a provenance receipt. Never contains secret key material. */
+export interface ReceiptIdentity {
+  accountId: string;
+  apiKeyId: string | null;
+  apiKeyLabel: string | null;
+  source: string;
+}
+
+/** The HMAC signature block on a provenance receipt. */
+export interface ReceiptSignature {
+  alg: string;
+  keyId: string;
+  /** Lowercase hex HMAC-SHA256 over the canonical unsigned receipt. */
+  value: string;
+}
+
+/**
+ * A signed provenance receipt (`documents.receipt`): binds a document to the request that produced it
+ * (`requestHash`), the pinned template version (`artifactHash`), the triggering identity, the issue
+ * time, and the content hash + chain link. Verify it offline against the published key.
+ */
+export interface ProvenanceReceipt {
+  documentId: string;
+  /** ISO 8601 timestamp. */
+  issuedAt: string;
+  templateId: string | null;
+  version: number | null;
+  artifactHash: string | null;
+  requestHash: string | null;
+  contentHash: string;
+  hashAlg: string;
+  chainSeq: number;
+  chainHash: string;
+  identity: ReceiptIdentity;
+  signature?: ReceiptSignature;
+}
+
+// ── Living documents (F04) ────────────────────────────────────────────────────
+
+/** One immutable version of a living document. */
+export interface LivingDocumentVersionInfo {
+  seq: number;
+  /** The underlying document id — poll `documents.get(documentId)`. */
+  documentId: string;
+  status: DocumentStatus;
+  contentHash: string | null;
+  chainSeq: number | null;
+  /** The seq that superseded this version, or null while it is the head. */
+  supersededBySeq: number | null;
+  /** ISO 8601 timestamp. */
+  createdAt: string;
+}
+
+/** A living-document identity without its version list. */
+export interface LivingDocumentSummary {
+  id: string;
+  name: string | null;
+  templateId: string;
+  templateVersion: number;
+  /** The public alias token, or null when none has been published. */
+  alias: string | null;
+  aliasEnabled: boolean;
+  /** The current head version's seq, or null until the first render completes. */
+  latestVersion: number | null;
+  /** ISO 8601 timestamps. */
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A living document with its full version history. */
+export interface LivingDocumentDetail extends LivingDocumentSummary {
+  versions: LivingDocumentVersionInfo[];
+}
+
+/** Parameters for `livingDocuments.create`. */
+export interface CreateLivingDocumentParams {
+  templateId: string;
+  /** Pin a specific published version to freeze; defaults to the template's current version. */
+  version?: number;
+  payload: Record<string, unknown>;
+  name?: string;
+  /** Publish a public `/d/:alias` link (requires the publicAlias plan capability). */
+  publicAlias?: boolean;
+}
+
+/** Parameters for `livingDocuments.reissue`. */
+export interface ReissueLivingDocumentParams {
+  payload: Record<string, unknown>;
+}
+
+/** Result of creating a living document: the identity plus the first version's queued document. */
+export interface CreateLivingDocumentResult {
+  livingDocument: LivingDocumentSummary;
+  document: { id: string; status: DocumentStatus };
+}
+
+/** Result of reissuing a living document: the identity id plus the new version's queued document. */
+export interface ReissueLivingDocumentResult {
+  id: string;
+  document: { id: string; status: DocumentStatus };
+}
+
+/** One page of the living-document list. */
+export interface LivingDocumentPage {
+  items: LivingDocumentSummary[];
+  nextCursor: string | null;
+}
+
+/** Parameters for `livingDocuments.list`. */
+export interface ListLivingDocumentsParams {
+  cursor?: string;
+  limit?: number;
 }
 
 /** The frozen editor source of a template version (returned by `version(id, n, { include: "source" })`). */

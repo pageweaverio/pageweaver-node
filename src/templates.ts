@@ -5,6 +5,7 @@ import type {
   TemplateSummary,
   TemplateVersionDetail,
   TemplateVersionSummary,
+  VersionAttestation,
 } from "./types";
 
 /** Read-only discovery of your published templates and their pinnable versions. */
@@ -48,6 +49,20 @@ export class TemplatesResource {
       "GET",
       `/v1/templates/${encodeURIComponent(id)}/versions/${encodeURIComponent(version)}`,
       { query: { include: opts.include }, signal: opts.signal },
+    );
+  }
+
+  /**
+   * Export a change-control attestation for one published version: its compiled-artifact fingerprint,
+   * chain position (`chainVerified`), publish metadata, and pinned schema version. Attach it to an
+   * audit package as proof the document contract was under formal version control. Requires a plan with
+   * the attestation-export capability. Proves an internal control trail, not a trusted signature.
+   */
+  attest(id: string, version: number, signal?: AbortSignal): Promise<VersionAttestation> {
+    return this.http.json<VersionAttestation>(
+      "GET",
+      `/v1/templates/${encodeURIComponent(id)}/versions/${encodeURIComponent(version)}/attest`,
+      { signal },
     );
   }
 }

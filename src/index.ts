@@ -19,6 +19,7 @@ export { ReviewsResource } from "./reviews";
 export { ShareLinksResource } from "./shareLinks";
 export { EnvironmentsResource } from "./environments";
 export { DeploymentsResource } from "./deployments";
+export { LivingDocumentsResource } from "./livingDocuments";
 
 export {
   PageWeaverError,
@@ -79,6 +80,21 @@ export type {
   TemplateVersionSummary,
   TemplateVersionSource,
   TemplateVersionDetail,
+  VersionAttestation,
+  // Provenance receipt (F02)
+  ProvenanceReceipt,
+  ReceiptIdentity,
+  ReceiptSignature,
+  // Living documents (F04)
+  LivingDocumentSummary,
+  LivingDocumentDetail,
+  LivingDocumentVersionInfo,
+  CreateLivingDocumentParams,
+  CreateLivingDocumentResult,
+  ReissueLivingDocumentParams,
+  ReissueLivingDocumentResult,
+  LivingDocumentPage,
+  ListLivingDocumentsParams,
   SchemaSummary,
   Schema,
   SchemaVersionSummary,
