@@ -61,7 +61,7 @@
         ]
       },
       "get": {
-        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, createdAfter/createdBefore (ISO date-time, bounding creation time), and delivery (the webhook-delivery state of each document: 'undelivered' for documents that were subscribed to a webhook but never delivered successfully \u00e2\u20ac\u201d the set to reconcile after an endpoint outage \u00e2\u20ac\u201d plus 'failed', 'delivered', 'pending', 'skipped', or 'none' for documents with no webhook). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
+        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, createdAfter/createdBefore (ISO date-time, bounding creation time), and delivery (the webhook-delivery state of each document: 'undelivered' for documents that were subscribed to a webhook but never delivered successfully — the set to reconcile after an endpoint outage — plus 'failed', 'delivered', 'pending', 'skipped', or 'none' for documents with no webhook). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
         "operationId": "RendersController_list",
         "parameters": [
           {
@@ -205,9 +205,39 @@
         ]
       }
     },
+    "/v1/documents/{id}/receipt": {
+      "get": {
+        "description": "Return a signed provenance receipt for a completed document: an HMAC-signed JSON bundle binding the file to the request that produced it (`requestHash`), the pinned template version it was rendered against (`artifactHash`), who triggered it (`identity`), when it was issued, and the content fingerprint plus hash-chain link. A downstream party verifies it offline against the published key, without an API call. Available on paid plans; a completed document only.",
+        "operationId": "RendersController_receipt",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Export a provenance receipt",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/{id}/regenerate": {
       "post": {
-        "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything \u00e2\u20ac\u201d it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",
+        "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything — it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",
         "operationId": "RendersController_regenerate",
         "parameters": [
           {
@@ -262,7 +292,7 @@
     },
     "/v1/usage": {
       "get": {
-        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page \u00e2\u20ac\u201d a 10-page PDF counts as 10; failed renders aren't counted.",
+        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page — a 10-page PDF counts as 10; failed renders aren't counted. Also returns the calling key's capability `scopes`, so a client (e.g. the CLI `login` command) can confirm the key and show what it may do.",
         "operationId": "UsageController_usage",
         "parameters": [],
         "responses": {
@@ -334,7 +364,7 @@
     },
     "/v1/templates/{id}/versions/{version}": {
       "get": {
-        "description": "One published version's metadata. Pass `?include=source` to also return the frozen editor source (compiled HTML + CSS, render settings, test data, pinned schema) \u2014 what `pageweaver pull` exports to round-trip a deployment. `read` scope; unknown version returns 404.",
+        "description": "One published version's metadata. Pass `?include=source` to also return the frozen editor source (compiled HTML + CSS, render settings, test data, pinned schema) — what `pageweaver pull` exports to round-trip a deployment. `read` scope; unknown version returns 404.",
         "operationId": "TemplatesController_versionDetail",
         "parameters": [
           {
@@ -373,6 +403,44 @@
           }
         ],
         "summary": "Get a template version",
+        "tags": [
+          "templates"
+        ]
+      }
+    },
+    "/v1/templates/{id}/versions/{version}/attest": {
+      "get": {
+        "description": "Export a change-control attestation for a published version: its compiled-artifact fingerprint (`artifactHash`), its position in the template's append-only artifact chain (`chainVerified`), the publish time and publisher, and the pinned schema version. Attach it to an audit package as proof the document contract was under formal version control. Available on paid plans; it proves an internal control trail, not a trusted digital signature.",
+        "operationId": "TemplatesController_attest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Attest a template version",
         "tags": [
           "templates"
         ]
@@ -461,7 +529,7 @@
     },
     "/v1/schemas/{id}/versions/{version}": {
       "get": {
-        "description": "One published version's metadata. Pass `?include=nodes` to also return the frozen typed field tree (FieldNode[]) \u2014 what `pageweaver pull` exports so a re-deployed schema matches. `read` scope; unknown version returns 404.",
+        "description": "One published version's metadata. Pass `?include=nodes` to also return the frozen typed field tree (FieldNode[]) — what `pageweaver pull` exports so a re-deployed schema matches. `read` scope; unknown version returns 404.",
         "operationId": "SchemasController_versionDetail",
         "parameters": [
           {
@@ -744,7 +812,7 @@
     },
     "/v1/comments/{id}/close": {
       "post": {
-        "description": "Close a thread (final \u00e2\u20ac\u201d it can no longer change state).",
+        "description": "Close a thread (final — it can no longer change state).",
         "operationId": "CommentsController_close",
         "parameters": [
           {
@@ -854,7 +922,7 @@
     },
     "/v1/documents/{id}/pages": {
       "get": {
-        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist \u00e2\u20ac\u201d the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
+        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist — the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
         "operationId": "DocumentCommentsController_listPages",
         "parameters": [
           {
@@ -1803,7 +1871,7 @@
     },
     "/v1/environments/{slug}/pins": {
       "get": {
-        "description": "The template \u00e2\u2020\u2019 version pointers in this environment.",
+        "description": "The template → version pointers in this environment.",
         "operationId": "EnvironmentsController_listPins",
         "parameters": [
           {
@@ -1917,7 +1985,7 @@
     },
     "/v1/environments/{slug}/promote": {
       "post": {
-        "description": "Copy another environment's pin set onto this one (e.g. staging \u00e2\u2020\u2019 production). Pass `templates` to partial-promote. Version history is never touched \u00e2\u20ac\u201d only pointers move.",
+        "description": "Copy another environment's pin set onto this one (e.g. staging → production). Pass `templates` to partial-promote. Version history is never touched — only pointers move.",
         "operationId": "EnvironmentsController_promote",
         "parameters": [
           {
@@ -2116,6 +2184,181 @@
           "deployments"
         ]
       }
+    },
+    "/v1/living-documents": {
+      "post": {
+        "description": "Create a stable document identity from a template and issue its first version. Freezes the pinned template version + schema; reissuing later changes the data, never the design. Optionally publishes a public /d/:alias link. Returns the living-document id and the first version's queued document id (poll GET /v1/documents/:id).",
+        "operationId": "LivingDocumentsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLivingDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a living document",
+        "tags": [
+          "living-documents"
+        ]
+      },
+      "get": {
+        "description": "Cursor-paginated list of this account's living documents, newest first.",
+        "operationId": "LivingDocumentsController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List living documents",
+        "tags": [
+          "living-documents"
+        ]
+      }
+    },
+    "/v1/living-documents/{id}/versions": {
+      "post": {
+        "description": "Issue a new version under the same identity: the new payload is validated against the pinned schema and rendered; it supersedes the prior head and fires document.superseded. An invalid payload is rejected (400) and creates no new version.",
+        "operationId": "LivingDocumentsController_reissue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReissueLivingDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Reissue a living document",
+        "tags": [
+          "living-documents"
+        ]
+      }
+    },
+    "/v1/living-documents/{id}/versions/{seq}": {
+      "get": {
+        "description": "One pinned version's metadata + integrity (the underlying document id, content hash, chain position).",
+        "operationId": "LivingDocumentsController_versionDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "seq",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a living-document version",
+        "tags": [
+          "living-documents"
+        ]
+      }
+    },
+    "/v1/living-documents/{id}": {
+      "get": {
+        "description": "The identity, its current head version, and the full ordered version history with per-version integrity.",
+        "operationId": "LivingDocumentsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a living document",
+        "tags": [
+          "living-documents"
+        ]
+      }
     }
   },
   "info": {
@@ -2191,7 +2434,7 @@
           },
           "clip": {
             "type": "boolean",
-            "description": "Clip the image to width\u00c3\u2014height (an exact crop) instead of capturing the full page."
+            "description": "Clip the image to width×height (an exact crop) instead of capturing the full page."
           },
           "quality": {
             "type": "number",
@@ -2795,25 +3038,25 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized x (0-1) \u00e2\u20ac\u201d point/area/text."
+            "description": "Normalized x (0-1) — point/area/text."
           },
           "y": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized y (0-1) \u00e2\u20ac\u201d point/area/text."
+            "description": "Normalized y (0-1) — point/area/text."
           },
           "width": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized width (0-1) \u00e2\u20ac\u201d area/text."
+            "description": "Normalized width (0-1) — area/text."
           },
           "height": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized height (0-1) \u00e2\u20ac\u201d area/text."
+            "description": "Normalized height (0-1) — area/text."
           },
           "selectedText": {
             "type": "string",
@@ -3124,7 +3367,7 @@
             "description": "Require an email (not just a name) before the external reviewer can interact (default false)."
           },
           "allowedDomains": {
-            "description": "Restrict the email gate to these domains (e.g. [\"acme.com\"]); empty \u00e2\u2021\u2019 any domain.",
+            "description": "Restrict the email gate to these domains (e.g. [\"acme.com\"]); empty ⇒ any domain.",
             "type": "array",
             "items": {
               "type": "string"
@@ -3163,7 +3406,7 @@
           },
           "password": {
             "type": "string",
-            "description": "Optional password gate (6\u00e2\u20ac\u201c128 chars); stored scrypt-hashed."
+            "description": "Optional password gate (6–128 chars); stored scrypt-hashed."
           },
           "expiresAt": {
             "type": "string",
@@ -3329,7 +3572,7 @@
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Manifest-relative path \u00e2\u2020\u2019 UTF-8 file contents for every file the manifest names (templates, schemas, test data). The CLI uploads only the referenced files, not the repository. Per-file and total size caps apply (mirroring the inline-render limits).",
+            "description": "Manifest-relative path → UTF-8 file contents for every file the manifest names (templates, schemas, test data). The CLI uploads only the referenced files, not the repository. Per-file and total size caps apply (mirroring the inline-render limits).",
             "example": {
               "templates/invoice.html": "<h1>{{ title }}</h1>",
               "schemas/invoice.json": "[]"
@@ -3366,6 +3609,49 @@
           "environment",
           "manifest",
           "files"
+        ]
+      },
+      "CreateLivingDocumentDto": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "description": "The template to render this living document from. Must have a published version."
+          },
+          "version": {
+            "type": "number",
+            "description": "Pin a specific published template version to freeze for this identity's whole life. Defaults to the template's current published version. Reissuing changes the data, never the design.",
+            "minimum": 1
+          },
+          "payload": {
+            "type": "object",
+            "description": "The payload for the first issued version, validated against the pinned schema."
+          },
+          "name": {
+            "type": "string",
+            "description": "A human label for the living document.",
+            "maxLength": 200
+          },
+          "publicAlias": {
+            "type": "boolean",
+            "description": "Publish a public /d/:alias link that always resolves to the latest version. Requires the publicAlias plan capability. The alias is an unguessable capability token."
+          }
+        },
+        "required": [
+          "templateId",
+          "payload"
+        ]
+      },
+      "ReissueLivingDocumentDto": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "type": "object",
+            "description": "The new payload for this version, validated against the identity's pinned schema."
+          }
+        },
+        "required": [
+          "payload"
         ]
       }
     }
