@@ -1327,6 +1327,19 @@ export interface Form {
   publishedAt: string;
 }
 
+/**
+ * The current version's frozen deployable source (`GET /v1/forms/:id?include=source`). The schema +
+ * template are NAMED (not ids) so `pageweaver pull` re-synthesizes a manifest form file that `deploy`
+ * plans as a noop. Layout + rules + tests are the full frozen artifact.
+ */
+export interface FormSource {
+  schemaRef: string;
+  templateRef: string;
+  layout: unknown;
+  rules: unknown;
+  tests: unknown;
+}
+
 /** A form plus its machine-readable field contract (`GET /v1/forms/:id`). */
 export interface FormDetail extends Form {
   fieldContract: {
@@ -1336,6 +1349,8 @@ export interface FormDetail extends Form {
     schema: Record<string, unknown>;
     fields: FormFieldContract[];
   };
+  /** Present only when requested with `include: "source"` — the deployable source for a manifest export. */
+  source?: FormSource;
 }
 
 /** A published FormVersion (`GET /v1/forms/:id/versions` row). */

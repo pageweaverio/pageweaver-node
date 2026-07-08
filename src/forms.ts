@@ -22,9 +22,16 @@ export class FormsResource {
     return this.http.json<Form[]>("GET", "/v1/forms", { signal });
   }
 
-  /** Fetch one form with its machine-readable field contract (pinned schema JSON + layout summary). */
-  get(id: string, signal?: AbortSignal): Promise<FormDetail> {
-    return this.http.json<FormDetail>("GET", `/v1/forms/${encodeURIComponent(id)}`, { signal });
+  /**
+   * Fetch one form with its machine-readable field contract (pinned schema JSON + layout summary). Pass
+   * `include: "source"` to also get the current version's frozen deployable source (named schema + template
+   * refs, layout, rules, tests) — what `pageweaver pull` exports into a manifest form file.
+   */
+  get(id: string, opts: { include?: "source"; signal?: AbortSignal } = {}): Promise<FormDetail> {
+    return this.http.json<FormDetail>("GET", `/v1/forms/${encodeURIComponent(id)}`, {
+      query: { include: opts.include },
+      signal: opts.signal,
+    });
   }
 
   /** Published version history of a form (newest first). */

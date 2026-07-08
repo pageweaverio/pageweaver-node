@@ -704,6 +704,22 @@ test("forms.get + forms.versions hit the right paths", async () => {
   assert.equal(calls[1]?.url, "http://api.test/v1/forms/form_1/versions");
 });
 
+test("forms.get with include=source appends the query and returns the deployable source", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      id: "form_1", name: "Intake", slug: "intake", currentVersion: 2, templateId: "tmpl_1",
+      templateVersion: 1, schemaId: "sch_1", schemaVersion: 1, snapshotHash: "h", publishedAt: "t",
+      fieldContract: { schemaId: "sch_1", schemaVersion: 1, schema: {}, fields: [] },
+      source: { schemaRef: "invoice-schema", templateRef: "invoice", layout: {}, rules: [], tests: null },
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const form = await pw.forms.get("form_1", { include: "source" });
+  assert.equal(calls[0]?.url, "http://api.test/v1/forms/form_1?include=source");
+  assert.equal(form.source?.schemaRef, "invoice-schema");
+  assert.equal(form.source?.templateRef, "invoice");
+});
+
 test("forms.validate POSTs the data body without metering", async () => {
   const { fetch, calls } = mockFetch([json(200, { valid: true, validationResult: { valid: true, errors: [] }, evaluatedState: null })]);
   const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });

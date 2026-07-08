@@ -189,6 +189,7 @@ export type {
   FormFieldContract,
   Form,
   FormDetail,
+  FormSource,
   FormVersion,
   FormDataParams,
   ValidateFormResult,
