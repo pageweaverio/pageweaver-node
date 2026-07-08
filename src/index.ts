@@ -20,6 +20,8 @@ export { ShareLinksResource } from "./shareLinks";
 export { EnvironmentsResource } from "./environments";
 export { DeploymentsResource } from "./deployments";
 export { LivingDocumentsResource } from "./livingDocuments";
+export { FormsResource } from "./forms";
+export { SubmissionsResource } from "./submissions";
 
 export {
   PageWeaverError,
@@ -178,4 +180,18 @@ export type {
   DeploymentDetail,
   PlanDeploymentParams,
   ListDeploymentsParams,
+  // Smart Forms (Phase D, V2-D06)
+  SubmissionStatus,
+  RuleMessage,
+  EvaluatedState,
+  RuleTraceEntry,
+  RuleTrace,
+  FormFieldContract,
+  Form,
+  FormDetail,
+  FormVersion,
+  FormDataParams,
+  ValidateFormResult,
+  CreateSubmissionResult,
+  Submission,
 } from "./types";

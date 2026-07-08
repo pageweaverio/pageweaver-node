@@ -682,3 +682,52 @@ test("deployments.apply posts to the apply sub-path", async () => {
   assert.equal(calls[0]?.method, "POST");
   assert.equal(calls[0]?.url, "http://api.test/v1/deployments/dep_1/apply");
 });
+
+test("forms.list GETs /v1/forms", async () => {
+  const { fetch, calls } = mockFetch([json(200, [])]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  await pw.forms.list();
+  assert.equal(calls[0]?.method, "GET");
+  assert.equal(calls[0]?.url, "http://api.test/v1/forms");
+});
+
+test("forms.get + forms.versions hit the right paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { id: "form_1", name: "Intake", slug: "intake", currentVersion: 2, templateId: "tmpl_1", templateVersion: 1, schemaId: "sch_1", schemaVersion: 1, snapshotHash: "h", publishedAt: "t", fieldContract: { schemaId: "sch_1", schemaVersion: 1, schema: {}, fields: [] } }),
+    json(200, []),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const form = await pw.forms.get("form_1");
+  assert.equal(form.fieldContract.schemaId, "sch_1");
+  await pw.forms.versions("form_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/forms/form_1");
+  assert.equal(calls[1]?.url, "http://api.test/v1/forms/form_1/versions");
+});
+
+test("forms.validate POSTs the data body without metering", async () => {
+  const { fetch, calls } = mockFetch([json(200, { valid: true, validationResult: { valid: true, errors: [] }, evaluatedState: null })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const res = await pw.forms.validate("form_1", { data: { needs_nda: true } });
+  assert.equal(res.valid, true);
+  assert.equal(calls[0]?.method, "POST");
+  assert.equal(calls[0]?.url, "http://api.test/v1/forms/form_1/validate");
+  assert.deepEqual(calls[0]?.body, { data: { needs_nda: true } });
+});
+
+test("forms.submit POSTs to the submissions sub-path and returns 202 id+status", async () => {
+  const { fetch, calls } = mockFetch([json(202, { id: "sbm_1", status: "submitted" })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const res = await pw.forms.submit("form_1", { data: { company_name: "Acme" } });
+  assert.equal(res.id, "sbm_1");
+  assert.equal(res.status, "submitted");
+  assert.equal(calls[0]?.url, "http://api.test/v1/forms/form_1/submissions");
+  assert.equal(calls[0]?.headers["x-api-key"], "pk_test_abc");
+});
+
+test("submissions.get GETs /v1/submissions/:id", async () => {
+  const { fetch, calls } = mockFetch([json(200, { id: "sbm_1", formId: "form_1", formVersion: 2, status: "rendered", dataHash: "h", renderJobId: "doc_9", validationResult: null, submittedAt: "t", createdAt: "t", updatedAt: "t" })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const sub = await pw.submissions.get("sbm_1");
+  assert.equal(sub.renderJobId, "doc_9");
+  assert.equal(calls[0]?.url, "http://api.test/v1/submissions/sbm_1");
+});

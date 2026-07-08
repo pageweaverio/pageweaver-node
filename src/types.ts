@@ -1249,3 +1249,139 @@ export interface ListDeploymentsParams {
   /** Max rows (1–200, default 50). */
   limit?: number;
 }
+
+// ── Smart Forms (Phase D, V2-D06) ────────────────────────────────────────────
+
+/** A submission's lifecycle status (06 §6.1). Mirrors the API's SubmissionStatus enum. */
+export type SubmissionStatus =
+  | "draft"
+  | "submitted"
+  | "validation_failed"
+  | "pending_approval"
+  | "approved"
+  | "changes_requested"
+  | "rendered"
+  | "delivered"
+  | "canceled";
+
+/** A rule-emitted message (an `add_error` / `add_warning`), optionally attached to a field. */
+export interface RuleMessage {
+  field?: string | null;
+  message: string;
+}
+
+/**
+ * The evaluated rule state for a set of inputs (06 §2.7): which fields/sections are visible, required,
+ * and enabled; computed values; narrowed option sets; included pages; and any rule errors/warnings. An
+ * unlisted key means "the schema/layout default".
+ */
+export interface EvaluatedState {
+  visible: Record<string, boolean>;
+  required: Record<string, boolean>;
+  enabled: Record<string, boolean>;
+  values: Record<string, unknown>;
+  options: Record<string, unknown>;
+  pages: Record<string, boolean>;
+  errors: RuleMessage[];
+  warnings: RuleMessage[];
+}
+
+/** One rule's line in an execution trace (why it did/didn't fire). */
+export interface RuleTraceEntry {
+  key: string;
+  branch: string;
+  matched: boolean;
+  applied: string[];
+  skipped?: string;
+}
+
+/** The execution trace of a rule pass (06 §2.8): per-rule outcomes + timing. */
+export interface RuleTrace {
+  rules: RuleTraceEntry[];
+  totalMs: number;
+  aborted: boolean;
+}
+
+/** One field in a form's contract: its key, label, type, whether it's required, its step + widget. */
+export interface FormFieldContract {
+  name: string;
+  label: string;
+  type: string;
+  required: boolean;
+  step: string | null;
+  widget: string | null;
+}
+
+/** A published form (the `GET /v1/forms` row). */
+export interface Form {
+  id: string;
+  name: string;
+  slug: string;
+  currentVersion: number;
+  templateId: string;
+  templateVersion: number;
+  schemaId: string;
+  schemaVersion: number;
+  /** SHA-256 of the frozen FormVersion (layout + rules + pins). */
+  snapshotHash: string;
+  publishedAt: string;
+}
+
+/** A form plus its machine-readable field contract (`GET /v1/forms/:id`). */
+export interface FormDetail extends Form {
+  fieldContract: {
+    schemaId: string;
+    schemaVersion: number;
+    /** The pinned SchemaVersion's compiled JSON Schema (the payload contract). */
+    schema: Record<string, unknown>;
+    fields: FormFieldContract[];
+  };
+}
+
+/** A published FormVersion (`GET /v1/forms/:id/versions` row). */
+export interface FormVersion {
+  version: number;
+  snapshotHash: string;
+  templateId: string;
+  templateVersion: number;
+  schemaId: string;
+  schemaVersion: number;
+  publishedAt: string;
+}
+
+/** Body of `POST /v1/forms/:id/validate` and `POST /v1/forms/:id/submissions`. */
+export interface FormDataParams {
+  /** The form field values (the shape a filler submits). Reserved `_form` is ignored. */
+  data: Record<string, unknown>;
+}
+
+/** Result of the `POST /v1/forms/:id/validate` dry-run (unmetered). */
+export interface ValidateFormResult {
+  valid: boolean;
+  validationResult: { valid: boolean; errors: string[] };
+  evaluatedState: EvaluatedState | null;
+  trace?: RuleTrace;
+}
+
+/** Result of `POST /v1/forms/:id/submissions` (the async 202 body). */
+export interface CreateSubmissionResult {
+  id: string;
+  status: SubmissionStatus | string;
+}
+
+/** A submission's status + document linkage (`GET /v1/submissions/:id`). */
+export interface Submission {
+  id: string;
+  formId: string | null;
+  formVersion: number;
+  status: SubmissionStatus | string;
+  /** SHA-256 of the canonicalized submitted data. */
+  dataHash: string;
+  /** The linked document (RenderJob) id once accepted for render; null otherwise. */
+  renderJobId: string | null;
+  /** Validation messages when the submission landed `validation_failed`; null otherwise. */
+  validationResult: Record<string, unknown> | null;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

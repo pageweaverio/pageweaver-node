@@ -9,6 +9,8 @@ import { ShareLinksResource } from "./shareLinks";
 import { EnvironmentsResource } from "./environments";
 import { DeploymentsResource } from "./deployments";
 import { LivingDocumentsResource } from "./livingDocuments";
+import { FormsResource } from "./forms";
+import { SubmissionsResource } from "./submissions";
 
 export interface PageWeaverOptions {
   /** Your secret API key: `pk_live_...` in production, `pk_test_...` in development. */
@@ -50,6 +52,10 @@ export class PageWeaver {
   readonly deployments: DeploymentsResource;
   /** Living documents (F04): a stable identity + permanent alias, reissued over time. */
   readonly livingDocuments: LivingDocumentsResource;
+  /** Smart Forms (Phase D): discover forms, dry-run a payload, submit headlessly (`render` scope to submit). */
+  readonly forms: FormsResource;
+  /** Form submissions: poll a submission's status + the document it produced. */
+  readonly submissions: SubmissionsResource;
 
   constructor(options: PageWeaverOptions) {
     const http = new HttpClient(options);
@@ -63,5 +69,7 @@ export class PageWeaver {
     this.environments = new EnvironmentsResource(http);
     this.deployments = new DeploymentsResource(http);
     this.livingDocuments = new LivingDocumentsResource(http);
+    this.forms = new FormsResource(http);
+    this.submissions = new SubmissionsResource(http);
   }
 }

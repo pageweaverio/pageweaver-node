@@ -95,6 +95,13 @@ const EXPECTED_ENDPOINTS: string[] = [
   "post /v1/deployments/{id}/apply",
   "get /v1/deployments",
   "get /v1/deployments/{id}",
+  // Smart Forms (Phase D, V2-D06). Form authoring has no public write path (portal + manifest only).
+  "get /v1/forms",
+  "get /v1/forms/{id}",
+  "get /v1/forms/{id}/versions",
+  "post /v1/forms/{id}/validate",
+  "post /v1/forms/{id}/submissions",
+  "get /v1/submissions/{id}",
 ];
 
 /**
@@ -208,6 +215,9 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   RollbackDto: ["toDeploymentId"],
   // Deployments request DTO (Pillar 3, V2-C02). Apply takes no body (path param only).
   PlanDeploymentDto: ["environment", "manifest", "files", "commitSha", "sourceRef", "source", "env"],
+  // Smart Forms request DTOs (Phase D, V2-D06). Both carry just the field `data`.
+  ValidateFormDto: ["data"],
+  CreateSubmissionDto: ["data"],
 };
 
 test("openapi drift: the SDK covers exactly the public endpoint set", () => {

@@ -2395,6 +2395,197 @@
           "living-documents"
         ]
       }
+    },
+    "/v1/forms": {
+      "get": {
+        "description": "All published forms owned by the key's account (id, name, slug, current version, and the pinned template + schema versions), newest-updated first. Draft-only forms are omitted. Authoring happens in the portal, not via the API.",
+        "operationId": "FormsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List published forms",
+        "tags": [
+          "forms"
+        ]
+      }
+    },
+    "/v1/forms/{id}/versions": {
+      "get": {
+        "description": "Published version history of a form (newest first): version, snapshotHash, pinned template + schema, publish time.",
+        "operationId": "FormsController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List form versions",
+        "tags": [
+          "forms"
+        ]
+      }
+    },
+    "/v1/forms/{id}/validate": {
+      "post": {
+        "description": "Run a form's rules against a candidate payload and report validity WITHOUT metering, persisting, or rendering. Returns whether the data is valid, the validation messages, and the evaluated rule state (visible/required/computed values, included pages) so an integration can wire up field logic before sending a real submission. Rate-limited; a great CI check.",
+        "operationId": "FormsController_validate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateFormDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Validate a submission (dry run)",
+        "tags": [
+          "forms"
+        ]
+      }
+    },
+    "/v1/forms/{id}/submissions": {
+      "post": {
+        "description": "Submit a form's field values headlessly. The server evaluates the rules authoritatively (hidden fields are discarded, spoofed `_form` is ignored), validates against the pinned contract, and — when valid — renders the bound template into a document. Returns 202 with the submission id + status (`submitted` once queued, or `validation_failed`). Poll GET /v1/submissions/:id for the linked document. Requires the `render` scope; counts against your monthly submission limit.",
+        "operationId": "FormsController_createSubmission",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSubmissionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a submission",
+        "tags": [
+          "forms"
+        ]
+      }
+    },
+    "/v1/forms/{id}": {
+      "get": {
+        "description": "A published form's metadata plus its machine-readable field contract: the pinned schema's compiled JSON Schema (the payload shape a submission must satisfy) and the ordered field summary (labels, steps, widgets). The account must own it; unknown/unpublished ids return 404.",
+        "operationId": "FormsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a form",
+        "tags": [
+          "forms"
+        ]
+      }
+    },
+    "/v1/submissions/{id}": {
+      "get": {
+        "description": "A submission's status (`submitted` / `validation_failed` / `rendered` / `delivered` / …), its data fingerprint, the linked document id (`renderJobId`) once accepted for render, and the validation messages when it failed. The account must own it; unknown id returns 404.",
+        "operationId": "SubmissionsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a submission",
+        "tags": [
+          "forms"
+        ]
+      }
     }
   },
   "info": {
@@ -3688,6 +3879,41 @@
         },
         "required": [
           "payload"
+        ]
+      },
+      "ValidateFormDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The form field values to dry-run (the same shape a filler submits). Reserved `_form` is ignored.",
+            "additionalProperties": true,
+            "example": {
+              "needs_nda": true,
+              "company_name": "Acme"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateSubmissionDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The submitted form field values. Reserved `_form` is ignored; rule-hidden fields are discarded server-side.",
+            "additionalProperties": true,
+            "example": {
+              "needs_nda": true,
+              "company_name": "Acme",
+              "nda_reference": "NDA-42"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       }
     }
