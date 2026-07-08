@@ -235,6 +235,42 @@
         ]
       }
     },
+    "/v1/documents/{id}/proof": {
+      "get": {
+        "description": "Download a self-contained ZIP that proves a completed document offline, with no account and no network. It bundles the exact PDF, a machine-readable `manifest.json` of its integrity fingerprints, the frozen template that produced it, the request that was sent, and a static `verify.html` that re-hashes everything in the recipient's browser and reports pass or fail. It proves the bytes are unaltered and the template is the pinned version; it does not claim two renders are identical. Available on paid plans; a completed, not-yet-purged document only.",
+        "operationId": "RendersController_proof",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A proof pack as application/zip."
+          },
+          "402": {
+            "description": "Proof packs are not available on the account's plan."
+          },
+          "409": {
+            "description": "The document is not completed, or its PDF was purged."
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Export a proof pack",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/{id}/regenerate": {
       "post": {
         "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything — it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",

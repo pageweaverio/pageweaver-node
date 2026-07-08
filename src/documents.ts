@@ -101,6 +101,20 @@ export class DocumentsResource {
     );
   }
 
+  /**
+   * Export an offline proof pack for a completed document: the raw bytes of a self-contained ZIP that
+   * bundles the exact PDF, a `manifest.json` of its integrity fingerprints, the frozen template that
+   * produced it, the request that was sent, and a static `verify.html` a recipient opens to re-hash and
+   * check everything client-side, with no account and no network. Write the bytes to a `.zip` file.
+   * Requires a plan with the proof-pack capability; a completed, not-yet-purged document only.
+   */
+  proofPack(id: string, signal?: AbortSignal): Promise<Uint8Array> {
+    return this.http.bytes("GET", `/v1/documents/${encodeURIComponent(id)}/proof`, {
+      headers: { accept: "application/zip" },
+      signal,
+    });
+  }
+
   /** One page of the document history, newest first. Use `nextCursor` to page. */
   list(params: ListDocumentsParams = {}, signal?: AbortSignal): Promise<DocumentPage> {
     return this.http.json<DocumentPage>("GET", "/v1/documents", {

@@ -118,6 +118,23 @@ test("documents.createSync streams raw PDF bytes with { pdf: true } (Accept: app
   assert.equal(call.headers["accept"], "application/pdf");
 });
 
+test("documents.proofPack GETs the proof sub-path as bytes with Accept: application/zip", async () => {
+  const zip = new Uint8Array([80, 75, 3, 4]); // PK\x03\x04
+  const { fetch, calls } = mockFetch([
+    new Response(zip, { status: 200, headers: { "content-type": "application/zip" } }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const out = await pw.documents.proofPack("doc_1");
+
+  assert.deepEqual(out, zip);
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.method, "GET");
+  assert.equal(call.url, "http://api.test/v1/documents/doc_1/proof");
+  assert.equal(call.headers["accept"], "application/zip");
+});
+
 test("documents.createSync falls back to a pending result when the wait deadline is exceeded", async () => {
   const { fetch } = mockFetch([json(202, { id: "doc_slow", status: "rendering", version: 1 })]);
   const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });

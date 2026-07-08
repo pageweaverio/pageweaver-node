@@ -29,6 +29,7 @@ const EXPECTED_ENDPOINTS: string[] = [
   "get /v1/documents/{id}",
   "get /v1/documents/{id}/verify",
   "get /v1/documents/{id}/receipt",
+  "get /v1/documents/{id}/proof",
   "post /v1/documents/{id}/regenerate",
   "get /v1/documents/{id}/content",
   "get /v1/templates",
