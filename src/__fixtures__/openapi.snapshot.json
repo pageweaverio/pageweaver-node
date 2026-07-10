@@ -145,6 +145,37 @@
         ]
       }
     },
+    "/v1/documents/validate": {
+      "post": {
+        "description": "Dry-run a payload against a template's JSON Schema and get pass or fail with error detail, without generating anything. Nothing is queued, no page is counted, and no usage is recorded, so an integrator or an agent can pre-flight its data (and repair it) for free before spending a render. Returns 200 with `{ ok, errors, version, schemaId, schemaVersion }`: `ok` is true when the payload satisfies the schema, otherwise `errors` lists what to fix. The response also echoes the exact version the check ran against, so validating and then generating pin the same contract.",
+        "operationId": "RendersController_validate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The validation result: `{ ok, errors, version, schemaId, schemaVersion }`."
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Validate a payload (no render)",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/{id}": {
       "get": {
         "description": "Poll a document. When status is 'done' the response includes a `download` block (a short-lived URL, or the password-gated content endpoint if the document is download-protected) plus `appliedOptions` (the per-render options it was created with).",
@@ -2529,13 +2560,21 @@
     },
     "/v1/forms/{id}": {
       "get": {
-        "description": "A published form's metadata plus its machine-readable field contract: the pinned schema's compiled JSON Schema (the payload shape a submission must satisfy) and the ordered field summary (labels, steps, widgets). The account must own it; unknown/unpublished ids return 404.",
+        "description": "A published form's metadata plus its machine-readable field contract: the pinned schema's compiled JSON Schema (the payload shape a submission must satisfy) and the ordered field summary (labels, steps, widgets). Pass include=source to also return the current version's frozen deployable source (named schema + template refs, layout, rules, tests) for a manifest export. The account must own it; unknown/unpublished ids return 404.",
         "operationId": "FormsController_get",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "required": true,
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -3219,6 +3258,41 @@
                 "$ref": "#/components/schemas/RenderOptionsDto"
               }
             ]
+          }
+        }
+      },
+      "ValidateDocumentDto": {
+        "type": "object",
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "example": "sample-invoice",
+            "description": "Template id (or the built-in 'sample-invoice') whose schema the payload is checked against."
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The data to validate against the template's JSON Schema."
+          },
+          "version": {
+            "type": "number",
+            "description": "Check against a published TEMPLATE version; defaults to the template's latest.",
+            "minimum": 1
+          },
+          "environment": {
+            "type": "string",
+            "description": "Check against the version this template is pinned to in the named environment (e.g. 'production'), instead of a numeric `version`. Mutually exclusive with `version`.",
+            "example": "production"
+          },
+          "schemaId": {
+            "type": "string",
+            "description": "Validate against THIS schema instead of the one the template pins. Your account must own it.",
+            "example": "cmxyz123schema"
+          },
+          "schemaVersion": {
+            "type": "number",
+            "description": "Pin a published SCHEMA version (requires schemaId); defaults to that schema's latest.",
+            "minimum": 1
           }
         }
       },

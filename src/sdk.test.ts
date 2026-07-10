@@ -262,6 +262,35 @@ test("documents.verify calls the verify endpoint with auth", async () => {
   assert.equal(call.headers["x-api-key"], "pk_test_abc");
 });
 
+test("documents.validate posts to the validate endpoint and returns the dry-run result", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      ok: false,
+      errors: ["(root) must have required property 'customer'"],
+      templateId: "tmpl_invoice",
+      version: 3,
+      schemaId: "sch_1",
+      schemaVersion: 2,
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const result = await pw.documents.validate({
+    templateId: "tmpl_invoice",
+    payload: { invoiceNumber: "A-1" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.version, 3);
+  assert.ok(result.errors[0]?.includes("customer"));
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.method, "POST");
+  assert.equal(call.url, "http://api.test/v1/documents/validate");
+  assert.equal(call.headers["x-api-key"], "pk_test_abc");
+  assert.deepEqual(call.body, { templateId: "tmpl_invoice", payload: { invoiceNumber: "A-1" } });
+});
+
 test("documents.download with a password hits the content endpoint without the API key", async () => {
   const pdf = new Uint8Array([37, 80, 68, 70]); // %PDF
   const { fetch, calls } = mockFetch([new Response(pdf, { status: 200 })]);

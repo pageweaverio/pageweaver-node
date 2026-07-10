@@ -25,6 +25,7 @@ const spec = loadSpec();
 /** Every endpoint the SDK calls, as `METHOD path`. Kept exhaustive so a NEW public path fails the test. */
 const EXPECTED_ENDPOINTS: string[] = [
   "post /v1/documents",
+  "post /v1/documents/validate",
   "get /v1/documents",
   "get /v1/documents/{id}",
   "get /v1/documents/{id}/verify",
@@ -125,6 +126,14 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "idempotencyKey",
     "callbackUrl",
     "options",
+  ],
+  ValidateDocumentDto: [
+    "templateId",
+    "payload",
+    "version",
+    "environment",
+    "schemaId",
+    "schemaVersion",
   ],
   OutputDto: ["format", "width", "height", "clip", "quality", "transparent", "optimizeForSpeed"],
   RenderOptionsDto: [

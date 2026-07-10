@@ -282,6 +282,40 @@ export interface CreateDocumentResult {
 }
 
 /**
+ * Parameters for a no-render dry-run ({@link DocumentsResource.validate}): check a payload against a
+ * template's frozen JSON Schema without rendering. A strict subset of a template create: the fields
+ * that select the validation contract, plus the payload.
+ */
+export interface ValidateDocumentParams {
+  /** Template id (or the built-in "sample-invoice") whose schema the payload is checked against. */
+  templateId: string;
+  /** The data to validate against the template's JSON Schema. */
+  payload: Record<string, unknown>;
+  /** Check against a published template version; defaults to the template's latest. */
+  version?: number;
+  /** Check against the version pinned in this environment instead of a numeric `version`. */
+  environment?: string;
+  /** Validate against this schema instead of the one the template pins (account-owned). */
+  schemaId?: string;
+  /** Pin a published schema version (requires `schemaId`); defaults to that schema's latest. */
+  schemaVersion?: number;
+}
+
+/**
+ * The result of a no-render validation. `ok` is the branch point; when false, `errors` lists what to
+ * fix. The resolved contract (`version`/`schemaId`/`schemaVersion`) is echoed so a caller knows which
+ * frozen schema it was checked against, and validating then issuing pin the same version.
+ */
+export interface ValidateDocumentResult {
+  ok: boolean;
+  errors: string[];
+  templateId: string;
+  version: number;
+  schemaId: string | null;
+  schemaVersion: number | null;
+}
+
+/**
  * The outcome of a synchronous ({@link DocumentsResource.createSync}) create. Discriminated on `kind`:
  *   - `pdf`      — an unprotected document finished within the deadline and its bytes were streamed.
  *   - `document` — a finished document as JSON: a download-protected or failed document, or when raw

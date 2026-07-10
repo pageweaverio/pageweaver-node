@@ -68,6 +68,8 @@ export type {
   CreateFromTemplateParams,
   CreateFromInlineParams,
   CreateDocumentResult,
+  ValidateDocumentParams,
+  ValidateDocumentResult,
   CreateSyncResult,
   DownloadInfo,
   Document,

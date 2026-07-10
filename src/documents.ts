@@ -14,6 +14,8 @@ import type {
   ListDocumentsParams,
   MigrateCommentsParams,
   MigrateCommentsResult,
+  ValidateDocumentParams,
+  ValidateDocumentResult,
 } from "./types";
 
 /** Statuses at which a document stops changing. */
@@ -65,6 +67,23 @@ export class DocumentsResource {
     return this.http.json<CreateDocumentResult>("POST", "/v1/documents", {
       body: rest,
       headers,
+      signal,
+    });
+  }
+
+  /**
+   * Dry-run a payload against a template's JSON Schema and get pass or fail with error detail, for
+   * free: nothing is rendered, no page is counted, and no usage is recorded. Use it to pre-flight (and
+   * repair) data before spending a render. Resolves with `{ ok, errors, version, schemaId,
+   * schemaVersion }`; when `ok` is false, fix the fields named in `errors` and try again. The `version`
+   * it echoes is the one a matching {@link create} pins, so validating then issuing use the same contract.
+   */
+  validate(
+    params: ValidateDocumentParams,
+    signal?: AbortSignal,
+  ): Promise<ValidateDocumentResult> {
+    return this.http.json<ValidateDocumentResult>("POST", "/v1/documents/validate", {
+      body: params,
       signal,
     });
   }
