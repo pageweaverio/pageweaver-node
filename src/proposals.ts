@@ -5,6 +5,7 @@ import type {
   ProposalDecisionParams,
   ProposalPage,
   PromoteProposalResult,
+  RunProposalChecksParams,
   TemplateProposal,
 } from "./types";
 
@@ -62,11 +63,18 @@ export class ProposalsResource {
   }
 
   /** Re-run the render-diff regression (candidate vs. the live version, per dataset). Returns `202`. */
-  rerunChecks(templateId: string, proposalId: string, signal?: AbortSignal): Promise<TemplateProposal> {
+  rerunChecks(
+    templateId: string,
+    proposalId: string,
+    paramsOrSignal: RunProposalChecksParams | AbortSignal = {},
+    signal?: AbortSignal,
+  ): Promise<TemplateProposal> {
+    const params = isAbortSignal(paramsOrSignal) ? {} : paramsOrSignal;
+    const requestSignal = isAbortSignal(paramsOrSignal) ? paramsOrSignal : signal;
     return this.http.json<TemplateProposal>(
       "POST",
       `/v1/templates/${encodeURIComponent(templateId)}/proposals/${encodeURIComponent(proposalId)}/checks`,
-      { signal },
+      { body: params, signal: requestSignal },
     );
   }
 
@@ -121,4 +129,8 @@ export class ProposalsResource {
       { signal },
     );
   }
+}
+
+function isAbortSignal(value: RunProposalChecksParams | AbortSignal): value is AbortSignal {
+  return typeof AbortSignal !== "undefined" && value instanceof AbortSignal;
 }

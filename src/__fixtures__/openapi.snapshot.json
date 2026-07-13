@@ -1621,7 +1621,7 @@
     },
     "/v1/templates/{id}/proposals/{proposalId}/checks": {
       "post": {
-        "description": "Re-run the render-diff regression (candidate vs. the live version, per saved dataset) and overwrite the check summary. Only while the proposal is open. Byte-identical output is reported when it occurs, but is never claimed as the test (rendered output is not byte-reproducible).",
+        "description": "Re-run the render-diff regression (candidate vs. the live version, per saved dataset) and overwrite the check summary. Optional policy fields are persisted in checkSummary.regression. Only while the proposal is open. Byte-identical output is reported when it occurs, but is never claimed as the test (rendered output is not byte-reproducible).",
         "operationId": "ProposalsController_runChecks",
         "parameters": [
           {
@@ -1641,6 +1641,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunProposalChecksDto"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "description": ""
@@ -3804,6 +3814,41 @@
           "approverUserId": {
             "type": "string",
             "description": "Attribute the decision to a member who is a named approver on a review targeting this proposal. When omitted, the decision is an integration decision authorized by the key's deploy scope."
+          }
+        }
+      },
+      "RunProposalChecksDto": {
+        "type": "object",
+        "properties": {
+          "regressionMode": {
+            "type": "string",
+            "enum": [
+              "advisory",
+              "strict"
+            ],
+            "description": "Advisory allows changed output after review; strict makes changed fixture output a publish-readiness blocker."
+          },
+          "checks": {
+            "description": "Observable regression signals to evaluate. Hash equality is a strong pass signal; hash inequality remains informational.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hash_equality",
+                "page_count",
+                "text_diff"
+              ]
+            }
+          },
+          "minSuccessfulFixtures": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 50,
+            "description": "Minimum number of fixtures that must render successfully before publish readiness passes."
+          },
+          "failOnErrors": {
+            "type": "boolean",
+            "description": "When false, fixture render/schema errors remain visible but do not block publish readiness."
           }
         }
       },

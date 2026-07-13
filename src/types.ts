@@ -1042,6 +1042,29 @@ export interface ProposalTextDiffStats {
 
 /** One dataset's verdict on the render-diff regression: `pass` (unchanged), `changed`, or `error`. */
 export type ProposalDatasetResult = "pass" | "changed" | "error";
+export type ProposalRegressionMode = "advisory" | "strict";
+export type ProposalRegressionCheckName = "hash_equality" | "page_count" | "text_diff";
+export type ProposalRegressionCheckStatus = "pass" | "changed" | "informational" | "skipped";
+
+export interface ProposalRegressionCheckResult {
+  name: ProposalRegressionCheckName;
+  status: ProposalRegressionCheckStatus;
+  message: string;
+}
+
+export interface ProposalRegressionPolicy {
+  mode: ProposalRegressionMode;
+  checks: ProposalRegressionCheckName[];
+  minSuccessfulFixtures: number;
+  failOnErrors: boolean;
+}
+
+export interface ProposalFixtureEvidence {
+  id: string;
+  name: string;
+  result: ProposalDatasetResult;
+  checks: ProposalRegressionCheckResult[];
+}
 
 /** A per-dataset outcome inside {@link ProposalCheckSummary}. */
 export interface ProposalDatasetCheck {
@@ -1058,6 +1081,7 @@ export interface ProposalDatasetCheck {
   hashEqual: boolean | null;
   /** Extracted-text line diff across all pages; null on error. */
   textDiffStats: ProposalTextDiffStats | null;
+  checks?: ProposalRegressionCheckResult[];
   /** Signed-URL-servable storage keys for the evidence; null once swept (30d after terminal). */
   artifactKeys: { candidate: string; base: string; diff: string } | null;
 }
@@ -1073,12 +1097,16 @@ export interface ProposalArtifactDiff {
 
 /** The durable `TemplateProposal.checkSummary` roll-up. */
 export interface ProposalCheckSummary {
-  version: 1;
+  version: 1 | 2;
   /** "none" = the template's schema has zero valid datasets → no regression coverage. */
   coverage: "covered" | "none";
   /** Every rendered dataset is `pass` (and at least one ran) → the reviewer's fast-approve signal. */
   noOutputChange: boolean;
   totals: { datasets: number; pass: number; changed: number; error: number };
+  /** Normalized policy used for the latest run. Present on v2 summaries. */
+  regression?: ProposalRegressionPolicy;
+  /** Durable named fixture evidence. Present on v2 summaries. */
+  fixtures?: ProposalFixtureEvidence[];
   artifactDiff: ProposalArtifactDiff;
   datasets: ProposalDatasetCheck[];
   ranAt: string;
@@ -1164,6 +1192,18 @@ export interface ProposalDecisionParams {
   note?: string;
   /** Attribute the decision to a named approver on a review targeting this proposal. */
   approverUserId?: string;
+}
+
+/** Optional policy body for `POST /v1/templates/:id/proposals/:proposalId/checks`. */
+export interface RunProposalChecksParams {
+  /** Advisory allows changed output after review; strict blocks promotion when fixtures changed. */
+  regressionMode?: ProposalRegressionMode;
+  /** Observable regression signals to evaluate for each fixture. */
+  checks?: ProposalRegressionCheckName[];
+  /** Minimum successful fixture renders required before publish readiness passes. */
+  minSuccessfulFixtures?: number;
+  /** When false, fixture render/schema errors stay visible but do not block publish readiness. */
+  failOnErrors?: boolean;
 }
 
 /** `POST …/promote` result. */

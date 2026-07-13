@@ -805,12 +805,23 @@ test("templates.proposals.get / rerunChecks / approve / reject / promote / retra
     "http://api.test/v1/templates/tmpl_x/proposals/prop_1",
   );
 
-  await pw.templates.proposals.rerunChecks("tmpl_x", "prop_1");
+  await pw.templates.proposals.rerunChecks("tmpl_x", "prop_1", {
+    regressionMode: "strict",
+    checks: ["page_count", "text_diff"],
+    minSuccessfulFixtures: 2,
+    failOnErrors: true,
+  });
   assert.equal(
     calls[1]?.url,
     "http://api.test/v1/templates/tmpl_x/proposals/prop_1/checks",
   );
   assert.equal(calls[1]?.method, "POST");
+  assert.deepEqual(calls[1]?.body, {
+    regressionMode: "strict",
+    checks: ["page_count", "text_diff"],
+    minSuccessfulFixtures: 2,
+    failOnErrors: true,
+  });
 
   await pw.templates.proposals.approve("tmpl_x", "prop_1", {
     approverUserId: "usr_2",

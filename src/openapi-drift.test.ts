@@ -280,6 +280,12 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "note",
   ],
   ProposalDecisionDto: ["note", "approverUserId"],
+  RunProposalChecksDto: [
+    "regressionMode",
+    "checks",
+    "minSuccessfulFixtures",
+    "failOnErrors",
+  ],
   CreateEnvironmentDto: ["name", "slug", "isProduction"],
   UpdateEnvironmentDto: ["name", "isProduction"],
   SetPinDto: ["version"],
