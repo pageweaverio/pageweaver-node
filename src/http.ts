@@ -1,10 +1,15 @@
 import { PageWeaverApiError, PageWeaverConnectionError } from "./errors";
 
 /** A `fetch` implementation compatible with the global one (Node 18+, browsers, undici). */
-export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+export type FetchLike = (
+  input: string,
+  init?: RequestInit,
+) => Promise<Response>;
 
 export interface HttpClientOptions {
   apiKey: string;
+  /** Account-local project id or slug sent as `X-PageWeaver-Project` on every API request. */
+  project?: string;
   /** API base URL. Defaults to https://api.pageweaver.io; point it at http://localhost:4000 in dev. */
   baseUrl?: string;
   /** Per-request timeout in milliseconds. Default 30000. */
@@ -32,13 +37,16 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  */
 export class HttpClient {
   private readonly apiKey: string;
+  private readonly project: string | undefined;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: FetchLike;
 
   constructor(opts: HttpClientOptions) {
-    if (!opts.apiKey) throw new PageWeaverConnectionError("An `apiKey` is required.");
+    if (!opts.apiKey)
+      throw new PageWeaverConnectionError("An `apiKey` is required.");
     this.apiKey = opts.apiKey;
+    this.project = opts.project?.trim() || undefined;
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const globalFetch = (globalThis as { fetch?: FetchLike }).fetch;
@@ -52,7 +60,11 @@ export class HttpClient {
   }
 
   /** Perform a request and parse a JSON response into `T`. */
-  async json<T>(method: string, path: string, init: RequestInitLite = {}): Promise<T> {
+  async json<T>(
+    method: string,
+    path: string,
+    init: RequestInitLite = {},
+  ): Promise<T> {
     const res = await this.send(method, path, init);
     if (res.status === 204) return undefined as T;
     const text = await res.text();
@@ -60,7 +72,11 @@ export class HttpClient {
   }
 
   /** Perform a request and return the raw response body as bytes (for PDF downloads). */
-  async bytes(method: string, path: string, init: RequestInitLite = {}): Promise<Uint8Array> {
+  async bytes(
+    method: string,
+    path: string,
+    init: RequestInitLite = {},
+  ): Promise<Uint8Array> {
     const res = await this.send(method, path, init);
     const buf = await res.arrayBuffer();
     return new Uint8Array(buf);
@@ -71,7 +87,11 @@ export class HttpClient {
    * {@link PageWeaverApiError}). For content-negotiated endpoints where the body may be JSON or bytes
    * depending on the response — e.g. synchronous create, which returns PDF, a document, or a 202.
    */
-  request(method: string, path: string, init: RequestInitLite = {}): Promise<Response> {
+  request(
+    method: string,
+    path: string,
+    init: RequestInitLite = {},
+  ): Promise<Response> {
     return this.send(method, path, init);
   }
 
@@ -79,7 +99,10 @@ export class HttpClient {
   async fetchUrlBytes(url: string, signal?: AbortSignal): Promise<Uint8Array> {
     const { controller, done } = this.withTimeout(signal);
     try {
-      const res = await this.fetchImpl(url, { method: "GET", signal: controller.signal });
+      const res = await this.fetchImpl(url, {
+        method: "GET",
+        signal: controller.signal,
+      });
       if (!res.ok) {
         throw new PageWeaverApiError({
           status: res.status,
@@ -95,10 +118,19 @@ export class HttpClient {
     }
   }
 
-  private async send(method: string, path: string, init: RequestInitLite): Promise<Response> {
+  private async send(
+    method: string,
+    path: string,
+    init: RequestInitLite,
+  ): Promise<Response> {
     const url = this.baseUrl + path + buildQuery(init.query);
-    const headers: Record<string, string> = { accept: "application/json", ...init.headers };
+    const headers: Record<string, string> = {
+      accept: "application/json",
+      ...init.headers,
+    };
     if (!init.noAuth) headers["x-api-key"] = this.apiKey;
+    if (!init.noAuth && this.project)
+      headers["x-pageweaver-project"] = this.project;
 
     let body: string | undefined;
     if (init.body !== undefined) {
@@ -109,7 +141,12 @@ export class HttpClient {
     const { controller, done } = this.withTimeout(init.signal);
     let res: Response;
     try {
-      res = await this.fetchImpl(url, { method, headers, body, signal: controller.signal });
+      res = await this.fetchImpl(url, {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+      });
     } catch (err) {
       throw this.wrapTransport(err);
     } finally {
@@ -121,7 +158,10 @@ export class HttpClient {
   }
 
   /** Compose a timeout AbortController with an optional caller-supplied signal. */
-  private withTimeout(signal?: AbortSignal): { controller: AbortController; done: () => void } {
+  private withTimeout(signal?: AbortSignal): {
+    controller: AbortController;
+    done: () => void;
+  } {
     const controller = new AbortController();
     const onAbort = (): void => controller.abort();
     if (signal) {
@@ -142,13 +182,17 @@ export class HttpClient {
     if (err instanceof PageWeaverApiError) throw err;
     const aborted = err instanceof Error && err.name === "AbortError";
     return new PageWeaverConnectionError(
-      aborted ? `Request timed out after ${this.timeoutMs}ms.` : `Request failed: ${describe(err)}`,
+      aborted
+        ? `Request timed out after ${this.timeoutMs}ms.`
+        : `Request failed: ${describe(err)}`,
       err,
     );
   }
 }
 
-function buildQuery(query?: Record<string, string | number | undefined>): string {
+function buildQuery(
+  query?: Record<string, string | number | undefined>,
+): string {
   if (!query) return "";
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {

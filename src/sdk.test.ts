@@ -19,7 +19,10 @@ interface Recorded {
 }
 
 /** Build a fake fetch that records calls and returns a scripted queue of responses. */
-function mockFetch(responses: Response[]): { fetch: FetchLike; calls: Recorded[] } {
+function mockFetch(responses: Response[]): {
+  fetch: FetchLike;
+  calls: Recorded[];
+} {
   const calls: Recorded[] = [];
   let i = 0;
   const fetch: FetchLike = async (url, init) => {
@@ -39,11 +42,20 @@ function mockFetch(responses: Response[]): { fetch: FetchLike; calls: Recorded[]
 }
 
 const json = (status: number, body: unknown): Response =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 
 test("documents.create posts with auth + idempotency header and strips it from the body", async () => {
-  const { fetch, calls } = mockFetch([json(202, { id: "doc_1", status: "queued", version: 3 })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_1", status: "queued", version: 3 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const res = await pw.documents.create({
     templateId: "tmpl_invoice",
@@ -61,7 +73,27 @@ test("documents.create posts with auth + idempotency header and strips it from t
   assert.equal(call.headers["x-api-key"], "pk_test_abc");
   assert.equal(call.headers["idempotency-key"], "idem-1");
   // idempotencyKey travels as a header, not in the JSON body.
-  assert.deepEqual(call.body, { templateId: "tmpl_invoice", payload: { total: 42 }, version: 3 });
+  assert.deepEqual(call.body, {
+    templateId: "tmpl_invoice",
+    payload: { total: 42 },
+    version: 3,
+  });
+});
+
+test("projects.list selects the configured project context", async () => {
+  const { fetch, calls } = mockFetch([json(200, [])]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    project: "european-invoicing",
+    baseUrl: "http://api.test",
+    fetch,
+  });
+
+  await pw.projects.list();
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(call.url, "http://api.test/v1/projects");
+  assert.equal(call.headers["x-pageweaver-project"], "european-invoicing");
 });
 
 test("documents.createSync defaults to JSON with the download url (no Accept: application/pdf)", async () => {
@@ -70,12 +102,23 @@ test("documents.createSync defaults to JSON with the download url (no Accept: ap
       id: "doc_sync",
       status: "done",
       version: 2,
-      download: { protected: false, requiresPassword: false, url: "http://cdn.test/doc_sync.pdf" },
+      download: {
+        protected: false,
+        requiresPassword: false,
+        url: "http://cdn.test/doc_sync.pdf",
+      },
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  const out = await pw.documents.createSync({ templateId: "t", payload: { a: 1 } });
+  const out = await pw.documents.createSync({
+    templateId: "t",
+    payload: { a: 1 },
+  });
 
   assert.equal(out.kind, "document");
   if (out.kind === "document") {
@@ -102,9 +145,16 @@ test("documents.createSync streams raw PDF bytes with { pdf: true } (Accept: app
       },
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  const out = await pw.documents.createSync({ templateId: "t", payload: { a: 1 } }, { pdf: true });
+  const out = await pw.documents.createSync(
+    { templateId: "t", payload: { a: 1 } },
+    { pdf: true },
+  );
 
   assert.equal(out.kind, "pdf");
   if (out.kind === "pdf") {
@@ -121,9 +171,16 @@ test("documents.createSync streams raw PDF bytes with { pdf: true } (Accept: app
 test("documents.proofPack GETs the proof sub-path as bytes with Accept: application/zip", async () => {
   const zip = new Uint8Array([80, 75, 3, 4]); // PK\x03\x04
   const { fetch, calls } = mockFetch([
-    new Response(zip, { status: 200, headers: { "content-type": "application/zip" } }),
+    new Response(zip, {
+      status: 200,
+      headers: { "content-type": "application/zip" },
+    }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const out = await pw.documents.proofPack("doc_1");
 
@@ -136,8 +193,14 @@ test("documents.proofPack GETs the proof sub-path as bytes with Accept: applicat
 });
 
 test("documents.createSync falls back to a pending result when the wait deadline is exceeded", async () => {
-  const { fetch } = mockFetch([json(202, { id: "doc_slow", status: "rendering", version: 1 })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch } = mockFetch([
+    json(202, { id: "doc_slow", status: "rendering", version: 1 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const out = await pw.documents.createSync({ templateId: "t", payload: {} });
 
@@ -154,12 +217,23 @@ test("documents.createSync returns JSON (never bytes) for a protected document e
       id: "doc_prot",
       status: "done",
       version: 1,
-      download: { protected: true, requiresPassword: true, url: "http://api.test/v1/documents/doc_prot/content" },
+      download: {
+        protected: true,
+        requiresPassword: true,
+        url: "http://api.test/v1/documents/doc_prot/content",
+      },
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  const out = await pw.documents.createSync({ templateId: "t", payload: {} }, { pdf: true });
+  const out = await pw.documents.createSync(
+    { templateId: "t", payload: {} },
+    { pdf: true },
+  );
 
   assert.equal(out.kind, "document");
   if (out.kind === "document") {
@@ -177,10 +251,18 @@ test("documents.waitFor polls until the document is done", async () => {
       id: "doc_2",
       status: "done",
       version: 1,
-      download: { protected: false, requiresPassword: false, url: "http://cdn.test/doc_2.pdf" },
+      download: {
+        protected: false,
+        requiresPassword: false,
+        url: "http://cdn.test/doc_2.pdf",
+      },
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const doc = await pw.documents.createAndWait(
     { templateId: "t", payload: {} },
@@ -196,7 +278,11 @@ test("documents.waitFor throws PageWeaverDocumentFailedError on failure", async 
   const { fetch } = mockFetch([
     json(200, { id: "doc_3", status: "failed", version: 1, error: "boom" }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await assert.rejects(
     () => pw.documents.waitFor("doc_3", { intervalMs: 1 }),
@@ -210,9 +296,16 @@ test("documents.waitFor throws PageWeaverDocumentFailedError on failure", async 
 
 test("a non-2xx response becomes a PageWeaverApiError carrying status + errors", async () => {
   const { fetch } = mockFetch([
-    json(400, { message: "Payload failed validation", errors: [{ path: "/total" }] }),
+    json(400, {
+      message: "Payload failed validation",
+      errors: [{ path: "/total" }],
+    }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await assert.rejects(
     () => pw.documents.create({ templateId: "t", payload: {} }),
@@ -227,14 +320,23 @@ test("a non-2xx response becomes a PageWeaverApiError carrying status + errors",
 });
 
 test("documents.list serializes query params", async () => {
-  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { items: [], nextCursor: null }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.documents.list({ status: "done", limit: 5, templateId: "t" });
 
   const call = calls[0];
   assert.ok(call);
-  assert.equal(call.url, "http://api.test/v1/documents?status=done&templateId=t&limit=5");
+  assert.equal(
+    call.url,
+    "http://api.test/v1/documents?status=done&templateId=t&limit=5",
+  );
 });
 
 test("documents.verify calls the verify endpoint with auth", async () => {
@@ -250,7 +352,11 @@ test("documents.verify calls the verify endpoint with auth", async () => {
       signature: null,
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const result = await pw.documents.verify("doc_9");
 
@@ -273,7 +379,11 @@ test("documents.validate posts to the validate endpoint and returns the dry-run 
       schemaVersion: 2,
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const result = await pw.documents.validate({
     templateId: "tmpl_invoice",
@@ -288,13 +398,20 @@ test("documents.validate posts to the validate endpoint and returns the dry-run 
   assert.equal(call.method, "POST");
   assert.equal(call.url, "http://api.test/v1/documents/validate");
   assert.equal(call.headers["x-api-key"], "pk_test_abc");
-  assert.deepEqual(call.body, { templateId: "tmpl_invoice", payload: { invoiceNumber: "A-1" } });
+  assert.deepEqual(call.body, {
+    templateId: "tmpl_invoice",
+    payload: { invoiceNumber: "A-1" },
+  });
 });
 
 test("documents.download with a password hits the content endpoint without the API key", async () => {
   const pdf = new Uint8Array([37, 80, 68, 70]); // %PDF
   const { fetch, calls } = mockFetch([new Response(pdf, { status: 200 })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const bytes = await pw.documents.download("doc_9", { password: "hunter2" });
 
@@ -308,7 +425,11 @@ test("documents.download with a password hits the content endpoint without the A
 
 test("templates.versions calls the right path", async () => {
   const { fetch, calls } = mockFetch([json(200, [])]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.templates.versions("tmpl_1");
 
@@ -316,21 +437,37 @@ test("templates.versions calls the right path", async () => {
 });
 
 test("templates.version fetches one version with include=source", async () => {
-  const { fetch, calls } = mockFetch([json(200, { version: 3, editorMode: "code", source: {} })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { version: 3, editorMode: "code", source: {} }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.templates.version("tmpl_1", 3, { include: "source" });
 
-  assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_1/versions/3?include=source");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/templates/tmpl_1/versions/3?include=source",
+  );
 });
 
 test("schemas.version fetches one version with include=nodes", async () => {
   const { fetch, calls } = mockFetch([json(200, { version: 2, nodes: [] })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.schemas.version("schema_1", 2, { include: "nodes" });
 
-  assert.equal(calls[0]?.url, "http://api.test/v1/schemas/schema_1/versions/2?include=nodes");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/schemas/schema_1/versions/2?include=nodes",
+  );
 });
 
 test("verifyWebhook round-trips and rejects tampering", () => {
@@ -365,9 +502,18 @@ test("verifyWebhook round-trips and rejects tampering", () => {
 
 test("comments.create posts an anchored thread to /v1/comments", async () => {
   const { fetch, calls } = mockFetch([
-    json(201, { id: "cth_1", documentId: "doc_1", anchorType: "point", status: "open" }),
+    json(201, {
+      id: "cth_1",
+      documentId: "doc_1",
+      anchorType: "point",
+      status: "open",
+    }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const thread = await pw.comments.create({
     documentId: "doc_1",
@@ -395,20 +541,39 @@ test("comments.create posts an anchored thread to /v1/comments", async () => {
 });
 
 test("comments.list hits the document-scoped path with filters as query params", async () => {
-  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { items: [], nextCursor: null }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  await pw.comments.list({ documentId: "doc_1", status: "open", pageNumber: 2 });
+  await pw.comments.list({
+    documentId: "doc_1",
+    status: "open",
+    pageNumber: 2,
+  });
 
   const call = calls[0];
   assert.ok(call);
   assert.equal(call.method, "GET");
-  assert.equal(call.url, "http://api.test/v1/documents/doc_1/comments?pageNumber=2&status=open");
+  assert.equal(
+    call.url,
+    "http://api.test/v1/documents/doc_1/comments?pageNumber=2&status=open",
+  );
 });
 
 test("comments.resolve posts to the resolve sub-path", async () => {
-  const { fetch, calls } = mockFetch([json(200, { id: "cth_1", status: "resolved" })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { id: "cth_1", status: "resolved" }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const thread = await pw.comments.resolve("cth_1");
 
@@ -418,8 +583,14 @@ test("comments.resolve posts to the resolve sub-path", async () => {
 });
 
 test("reviews.create posts to /v1/reviews with policy + participants", async () => {
-  const { fetch, calls } = mockFetch([json(201, { id: "rev_1", documentId: "doc_1", status: "open" })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "rev_1", documentId: "doc_1", status: "open" }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const review = await pw.reviews.create({
     documentId: "doc_1",
@@ -441,8 +612,14 @@ test("reviews.create posts to /v1/reviews with policy + participants", async () 
 });
 
 test("reviews.approve posts a decision to the approvals sub-path", async () => {
-  const { fetch, calls } = mockFetch([json(201, { id: "rev_1", status: "completed" })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "rev_1", status: "completed" }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.reviews.approve("rev_1", { decision: "approved", note: "LGTM" });
 
@@ -453,19 +630,37 @@ test("reviews.approve posts a decision to the approvals sub-path", async () => {
 });
 
 test("reviews.list forwards status + documentId as query params", async () => {
-  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { items: [], nextCursor: null }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.reviews.list({ status: "open", documentId: "doc_1" });
 
-  assert.equal(calls[0]?.url, "http://api.test/v1/reviews?status=open&documentId=doc_1");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/reviews?status=open&documentId=doc_1",
+  );
 });
 
 test("shareLinks.create returns the raw url/token once", async () => {
   const { fetch, calls } = mockFetch([
-    json(201, { id: "shl_1", url: "http://portal/r/tok", token: "tok", targetType: "render" }),
+    json(201, {
+      id: "shl_1",
+      url: "http://portal/r/tok",
+      token: "tok",
+      targetType: "render",
+    }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const link = await pw.shareLinks.create({
     targetType: "render",
@@ -479,8 +674,14 @@ test("shareLinks.create returns the raw url/token once", async () => {
 });
 
 test("shareLinks.disable posts to the disable sub-path", async () => {
-  const { fetch, calls } = mockFetch([json(200, { id: "shl_1", disabledAt: "2026-07-06T00:00:00Z" })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { id: "shl_1", disabledAt: "2026-07-06T00:00:00Z" }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   await pw.shareLinks.disable("shl_1");
 
@@ -490,18 +691,35 @@ test("shareLinks.disable posts to the disable sub-path", async () => {
 
 test("documents.pages + migrateComments hit the document sub-paths", async () => {
   const { fetch, calls } = mockFetch([
-    json(200, [{ pageNumber: 1, widthPts: 612, heightPts: 792, hasText: true, hasThumbnail: true }]),
+    json(200, [
+      {
+        pageNumber: 1,
+        widthPts: 612,
+        heightPts: 792,
+        hasText: true,
+        hasThumbnail: true,
+      },
+    ]),
     json(202, { status: "queued" }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const pages = await pw.documents.pages("doc_1");
   assert.equal(pages[0]?.pageNumber, 1);
   assert.equal(calls[0]?.url, "http://api.test/v1/documents/doc_1/pages");
 
-  const res = await pw.documents.migrateComments("doc_2", { fromDocumentId: "doc_1" });
+  const res = await pw.documents.migrateComments("doc_2", {
+    fromDocumentId: "doc_1",
+  });
   assert.equal(res.status, "queued");
-  assert.equal(calls[1]?.url, "http://api.test/v1/documents/doc_2/migrate-comments");
+  assert.equal(
+    calls[1]?.url,
+    "http://api.test/v1/documents/doc_2/migrate-comments",
+  );
   assert.deepEqual(calls[1]?.body, { fromDocumentId: "doc_1" });
 });
 
@@ -509,11 +727,24 @@ test("documents.pages + migrateComments hit the document sub-paths", async () =>
 
 test("templates.proposals.open posts the candidate body under the template", async () => {
   const { fetch, calls } = mockFetch([
-    json(202, { id: "prop_1", templateId: "tmpl_x", status: "open", checkStatus: "pending", baseVersion: 7 }),
+    json(202, {
+      id: "prop_1",
+      templateId: "tmpl_x",
+      status: "open",
+      checkStatus: "pending",
+      baseVersion: 7,
+    }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  const prop = await pw.templates.proposals.open("tmpl_x", { fromDraft: true, note: "tweak footer" });
+  const prop = await pw.templates.proposals.open("tmpl_x", {
+    fromDraft: true,
+    note: "tweak footer",
+  });
 
   assert.equal(prop.id, "prop_1");
   assert.equal(prop.status, "open");
@@ -526,63 +757,133 @@ test("templates.proposals.open posts the candidate body under the template", asy
 });
 
 test("templates.proposals.list forwards status + cursor as query", async () => {
-  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, { items: [], nextCursor: null }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  const page = await pw.templates.proposals.list("tmpl_x", { status: "open", limit: 10 });
+  const page = await pw.templates.proposals.list("tmpl_x", {
+    status: "open",
+    limit: 10,
+  });
 
   assert.deepEqual(page.items, []);
   assert.equal(page.nextCursor, null);
-  assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_x/proposals?status=open&limit=10");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals?status=open&limit=10",
+  );
 });
 
 test("templates.proposals.get / rerunChecks / approve / reject / promote / retract hit the right sub-paths", async () => {
   const { fetch, calls } = mockFetch([
-    json(200, { id: "prop_1", status: "open", gate: { promotable: false, blockReason: "approvals 0/2" } }),
+    json(200, {
+      id: "prop_1",
+      status: "open",
+      gate: { promotable: false, blockReason: "approvals 0/2" },
+    }),
     json(202, { id: "prop_1", checkStatus: "pending" }),
     json(201, { id: "prop_1", status: "open" }),
     json(201, { id: "prop_1", status: "rejected" }),
     json(200, { promotedVersion: 8 }),
     json(200, { ok: true }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const got = await pw.templates.proposals.get("tmpl_x", "prop_1");
   assert.equal(got.gate?.promotable, false);
-  assert.equal(calls[0]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals/prop_1",
+  );
 
   await pw.templates.proposals.rerunChecks("tmpl_x", "prop_1");
-  assert.equal(calls[1]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/checks");
+  assert.equal(
+    calls[1]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals/prop_1/checks",
+  );
   assert.equal(calls[1]?.method, "POST");
 
-  await pw.templates.proposals.approve("tmpl_x", "prop_1", { approverUserId: "usr_2" });
-  assert.equal(calls[2]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/approve");
+  await pw.templates.proposals.approve("tmpl_x", "prop_1", {
+    approverUserId: "usr_2",
+  });
+  assert.equal(
+    calls[2]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals/prop_1/approve",
+  );
   assert.deepEqual(calls[2]?.body, { approverUserId: "usr_2" });
 
   await pw.templates.proposals.reject("tmpl_x", "prop_1", { note: "not yet" });
-  assert.equal(calls[3]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/reject");
+  assert.equal(
+    calls[3]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals/prop_1/reject",
+  );
 
   const promoted = await pw.templates.proposals.promote("tmpl_x", "prop_1");
   assert.equal(promoted.promotedVersion, 8);
-  assert.equal(calls[4]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1/promote");
+  assert.equal(
+    calls[4]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals/prop_1/promote",
+  );
 
   const retracted = await pw.templates.proposals.retract("tmpl_x", "prop_1");
   assert.equal(retracted.ok, true);
   assert.equal(calls[5]?.method, "DELETE");
-  assert.equal(calls[5]?.url, "http://api.test/v1/templates/tmpl_x/proposals/prop_1");
+  assert.equal(
+    calls[5]?.url,
+    "http://api.test/v1/templates/tmpl_x/proposals/prop_1",
+  );
 });
 
 // ── Environments & pins (Pillar 2, V2-B06) ───────────────────────────────────────
 
 test("environments.list / create / get / update / delete hit /v1/environments", async () => {
   const { fetch, calls } = mockFetch([
-    json(200, [{ id: "env_1", name: "Production", slug: "production", isProduction: true, pinCount: 2 }]),
-    json(201, { id: "env_2", name: "Staging", slug: "staging", isProduction: false, pinCount: 0 }),
-    json(200, { id: "env_2", name: "Staging", slug: "staging", isProduction: false, pinCount: 0 }),
-    json(200, { id: "env_2", name: "Stage", slug: "staging", isProduction: false, pinCount: 0 }),
+    json(200, [
+      {
+        id: "env_1",
+        name: "Production",
+        slug: "production",
+        isProduction: true,
+        pinCount: 2,
+      },
+    ]),
+    json(201, {
+      id: "env_2",
+      name: "Staging",
+      slug: "staging",
+      isProduction: false,
+      pinCount: 0,
+    }),
+    json(200, {
+      id: "env_2",
+      name: "Staging",
+      slug: "staging",
+      isProduction: false,
+      pinCount: 0,
+    }),
+    json(200, {
+      id: "env_2",
+      name: "Stage",
+      slug: "staging",
+      isProduction: false,
+      pinCount: 0,
+    }),
     json(200, { deleted: true }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const envs = await pw.environments.list();
   assert.equal(envs[0]?.slug, "production");
@@ -605,29 +906,59 @@ test("environments.list / create / get / update / delete hit /v1/environments", 
 
 test("environments.pins / setPin / removePin / promote hit the pin sub-paths", async () => {
   const { fetch, calls } = mockFetch([
-    json(200, [{ templateId: "tmpl_x", version: 7, updatedByUserId: null, deploymentId: null, updatedAt: "t" }]),
-    json(200, { templateId: "tmpl_x", version: 8, updatedByUserId: "usr_1", deploymentId: null, updatedAt: "t" }),
+    json(200, [
+      {
+        templateId: "tmpl_x",
+        version: 7,
+        updatedByUserId: null,
+        deploymentId: null,
+        updatedAt: "t",
+      },
+    ]),
+    json(200, {
+      templateId: "tmpl_x",
+      version: 8,
+      updatedByUserId: "usr_1",
+      deploymentId: null,
+      updatedAt: "t",
+    }),
     json(200, { deleted: true }),
     json(200, { promoted: 2, pins: [] }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const pins = await pw.environments.pins("production");
   assert.equal(pins[0]?.version, 7);
-  assert.equal(calls[0]?.url, "http://api.test/v1/environments/production/pins");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/environments/production/pins",
+  );
 
   const pin = await pw.environments.setPin("production", "tmpl_x", 8);
   assert.equal(pin.version, 8);
   assert.equal(calls[1]?.method, "PUT");
-  assert.equal(calls[1]?.url, "http://api.test/v1/environments/production/pins/tmpl_x");
+  assert.equal(
+    calls[1]?.url,
+    "http://api.test/v1/environments/production/pins/tmpl_x",
+  );
   assert.deepEqual(calls[1]?.body, { version: 8 });
 
   await pw.environments.removePin("production", "tmpl_x");
   assert.equal(calls[2]?.method, "DELETE");
 
-  const res = await pw.environments.promote("production", { from: "staging", templates: ["tmpl_x"] });
+  const res = await pw.environments.promote("production", {
+    from: "staging",
+    templates: ["tmpl_x"],
+  });
   assert.equal(res.promoted, 2);
-  assert.equal(calls[3]?.url, "http://api.test/v1/environments/production/promote");
+  assert.equal(
+    calls[3]?.url,
+    "http://api.test/v1/environments/production/promote",
+  );
   assert.deepEqual(calls[3]?.body, { from: "staging", templates: ["tmpl_x"] });
 });
 
@@ -635,22 +966,45 @@ test("environments.rollback posts to the rollback sub-path", async () => {
   const { fetch, calls } = mockFetch([
     json(200, { deploymentId: "dep_new", restored: [], rolledBack: "dep_old" }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  const res = await pw.environments.rollback("production", { toDeploymentId: "dep_old" });
+  const res = await pw.environments.rollback("production", {
+    toDeploymentId: "dep_old",
+  });
   assert.equal(res.rolledBack, "dep_old");
   assert.equal(calls[0]?.method, "POST");
-  assert.equal(calls[0]?.url, "http://api.test/v1/environments/production/rollback");
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/environments/production/rollback",
+  );
   assert.deepEqual(calls[0]?.body, { toDeploymentId: "dep_old" });
 });
 
 test("documents.create accepts an environment selector in the body", async () => {
-  const { fetch, calls } = mockFetch([json(202, { id: "doc_9", status: "queued", version: 7 })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_9", status: "queued", version: 7 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
-  await pw.documents.create({ templateId: "tmpl_x", payload: { total: 1 }, environment: "production" });
+  await pw.documents.create({
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    environment: "production",
+  });
 
-  assert.deepEqual(calls[0]?.body, { templateId: "tmpl_x", payload: { total: 1 }, environment: "production" });
+  assert.deepEqual(calls[0]?.body, {
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    environment: "production",
+  });
 });
 
 test("deployments.plan / list / get hit /v1/deployments with the idempotency header", async () => {
@@ -666,13 +1020,45 @@ test("deployments.plan / list / get hit /v1/deployments with the idempotency hea
       plan: { changes: [], warnings: [] },
       createdAt: "t",
     }),
-    json(200, [{ id: "dep_1", status: "planned", environment: "production", source: "cli", sourceRef: null, commitSha: null, manifestHash: "abc", plan: { changes: [], warnings: [] }, createdAt: "t" }]),
-    json(200, { id: "dep_1", status: "planned", environment: "production", source: "cli", sourceRef: null, commitSha: "9f3c1a2", manifestHash: "abc", plan: { changes: [], warnings: [] }, createdAt: "t", resources: [] }),
+    json(200, [
+      {
+        id: "dep_1",
+        status: "planned",
+        environment: "production",
+        source: "cli",
+        sourceRef: null,
+        commitSha: null,
+        manifestHash: "abc",
+        plan: { changes: [], warnings: [] },
+        createdAt: "t",
+      },
+    ]),
+    json(200, {
+      id: "dep_1",
+      status: "planned",
+      environment: "production",
+      source: "cli",
+      sourceRef: null,
+      commitSha: "9f3c1a2",
+      manifestHash: "abc",
+      plan: { changes: [], warnings: [] },
+      createdAt: "t",
+      resources: [],
+    }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const plan = await pw.deployments.plan(
-    { environment: "production", manifest: "apiVersion: pageweaver.io/v1", files: { "a.html": "<p/>" }, commitSha: "9f3c1a2" },
+    {
+      environment: "production",
+      manifest: "apiVersion: pageweaver.io/v1",
+      files: { "a.html": "<p/>" },
+      commitSha: "9f3c1a2",
+    },
     { idempotencyKey: "idem-42" },
   );
   assert.equal(plan.id, "dep_1");
@@ -682,7 +1068,10 @@ test("deployments.plan / list / get hit /v1/deployments with the idempotency hea
 
   const list = await pw.deployments.list({ environment: "production" });
   assert.equal(list[0]?.id, "dep_1");
-  assert.equal(calls[1]?.url, "http://api.test/v1/deployments?environment=production");
+  assert.equal(
+    calls[1]?.url,
+    "http://api.test/v1/deployments?environment=production",
+  );
 
   const detail = await pw.deployments.get("dep_1");
   assert.deepEqual(detail.resources, []);
@@ -704,7 +1093,11 @@ test("deployments.apply posts to the apply sub-path", async () => {
       resources: [],
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
 
   const applied = await pw.deployments.apply("dep_1");
   assert.equal(applied.status, "applying");
@@ -714,7 +1107,11 @@ test("deployments.apply posts to the apply sub-path", async () => {
 
 test("forms.list GETs /v1/forms", async () => {
   const { fetch, calls } = mockFetch([json(200, [])]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
   await pw.forms.list();
   assert.equal(calls[0]?.method, "GET");
   assert.equal(calls[0]?.url, "http://api.test/v1/forms");
@@ -722,10 +1119,31 @@ test("forms.list GETs /v1/forms", async () => {
 
 test("forms.get + forms.versions hit the right paths", async () => {
   const { fetch, calls } = mockFetch([
-    json(200, { id: "form_1", name: "Intake", slug: "intake", currentVersion: 2, templateId: "tmpl_1", templateVersion: 1, schemaId: "sch_1", schemaVersion: 1, snapshotHash: "h", publishedAt: "t", fieldContract: { schemaId: "sch_1", schemaVersion: 1, schema: {}, fields: [] } }),
+    json(200, {
+      id: "form_1",
+      name: "Intake",
+      slug: "intake",
+      currentVersion: 2,
+      templateId: "tmpl_1",
+      templateVersion: 1,
+      schemaId: "sch_1",
+      schemaVersion: 1,
+      snapshotHash: "h",
+      publishedAt: "t",
+      fieldContract: {
+        schemaId: "sch_1",
+        schemaVersion: 1,
+        schema: {},
+        fields: [],
+      },
+    }),
     json(200, []),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
   const form = await pw.forms.get("form_1");
   assert.equal(form.fieldContract.schemaId, "sch_1");
   await pw.forms.versions("form_1");
@@ -736,13 +1154,36 @@ test("forms.get + forms.versions hit the right paths", async () => {
 test("forms.get with include=source appends the query and returns the deployable source", async () => {
   const { fetch, calls } = mockFetch([
     json(200, {
-      id: "form_1", name: "Intake", slug: "intake", currentVersion: 2, templateId: "tmpl_1",
-      templateVersion: 1, schemaId: "sch_1", schemaVersion: 1, snapshotHash: "h", publishedAt: "t",
-      fieldContract: { schemaId: "sch_1", schemaVersion: 1, schema: {}, fields: [] },
-      source: { schemaRef: "invoice-schema", templateRef: "invoice", layout: {}, rules: [], tests: null },
+      id: "form_1",
+      name: "Intake",
+      slug: "intake",
+      currentVersion: 2,
+      templateId: "tmpl_1",
+      templateVersion: 1,
+      schemaId: "sch_1",
+      schemaVersion: 1,
+      snapshotHash: "h",
+      publishedAt: "t",
+      fieldContract: {
+        schemaId: "sch_1",
+        schemaVersion: 1,
+        schema: {},
+        fields: [],
+      },
+      source: {
+        schemaRef: "invoice-schema",
+        templateRef: "invoice",
+        layout: {},
+        rules: [],
+        tests: null,
+      },
     }),
   ]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
   const form = await pw.forms.get("form_1", { include: "source" });
   assert.equal(calls[0]?.url, "http://api.test/v1/forms/form_1?include=source");
   assert.equal(form.source?.schemaRef, "invoice-schema");
@@ -750,8 +1191,18 @@ test("forms.get with include=source appends the query and returns the deployable
 });
 
 test("forms.validate POSTs the data body without metering", async () => {
-  const { fetch, calls } = mockFetch([json(200, { valid: true, validationResult: { valid: true, errors: [] }, evaluatedState: null })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      valid: true,
+      validationResult: { valid: true, errors: [] },
+      evaluatedState: null,
+    }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
   const res = await pw.forms.validate("form_1", { data: { needs_nda: true } });
   assert.equal(res.valid, true);
   assert.equal(calls[0]?.method, "POST");
@@ -760,9 +1211,17 @@ test("forms.validate POSTs the data body without metering", async () => {
 });
 
 test("forms.submit POSTs to the submissions sub-path and returns 202 id+status", async () => {
-  const { fetch, calls } = mockFetch([json(202, { id: "sbm_1", status: "submitted" })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
-  const res = await pw.forms.submit("form_1", { data: { company_name: "Acme" } });
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "sbm_1", status: "submitted" }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
+  const res = await pw.forms.submit("form_1", {
+    data: { company_name: "Acme" },
+  });
   assert.equal(res.id, "sbm_1");
   assert.equal(res.status, "submitted");
   assert.equal(calls[0]?.url, "http://api.test/v1/forms/form_1/submissions");
@@ -770,8 +1229,25 @@ test("forms.submit POSTs to the submissions sub-path and returns 202 id+status",
 });
 
 test("submissions.get GETs /v1/submissions/:id", async () => {
-  const { fetch, calls } = mockFetch([json(200, { id: "sbm_1", formId: "form_1", formVersion: 2, status: "rendered", dataHash: "h", renderJobId: "doc_9", validationResult: null, submittedAt: "t", createdAt: "t", updatedAt: "t" })]);
-  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      id: "sbm_1",
+      formId: "form_1",
+      formVersion: 2,
+      status: "rendered",
+      dataHash: "h",
+      renderJobId: "doc_9",
+      validationResult: null,
+      submittedAt: "t",
+      createdAt: "t",
+      updatedAt: "t",
+    }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
   const sub = await pw.submissions.get("sbm_1");
   assert.equal(sub.renderJobId, "doc_9");
   assert.equal(calls[0]?.url, "http://api.test/v1/submissions/sbm_1");

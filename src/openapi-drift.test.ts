@@ -17,13 +17,17 @@ import { test } from "node:test";
 
 interface OpenApiSpec {
   paths: Record<string, Record<string, unknown>>;
-  components: { schemas: Record<string, { properties?: Record<string, unknown> }> };
+  components: {
+    schemas: Record<string, { properties?: Record<string, unknown> }>;
+  };
 }
 
 const spec = loadSpec();
 
 /** Every endpoint the SDK calls, as `METHOD path`. Kept exhaustive so a NEW public path fails the test. */
 const EXPECTED_ENDPOINTS: string[] = [
+  // Phase 2A project context. Send X-PageWeaver-Project with a project id or slug to select one.
+  "get /v1/projects",
   "post /v1/documents",
   "post /v1/documents/validate",
   "get /v1/documents",
@@ -135,7 +139,15 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "schemaId",
     "schemaVersion",
   ],
-  OutputDto: ["format", "width", "height", "clip", "quality", "transparent", "optimizeForSpeed"],
+  OutputDto: [
+    "format",
+    "width",
+    "height",
+    "clip",
+    "quality",
+    "transparent",
+    "optimizeForSpeed",
+  ],
   RenderOptionsDto: [
     "page",
     "rendering",
@@ -159,13 +171,34 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   ],
   OptionsMetadataDto: ["title", "author", "subject", "keywords", "creator"],
   OptionsBandDto: ["enabled", "left", "center", "right", "fontSizePt", "color"],
-  OptionsWatermarkDto: ["text", "pages", "fontSizePt", "color", "opacity", "rotation"],
+  OptionsWatermarkDto: [
+    "text",
+    "pages",
+    "fontSizePt",
+    "color",
+    "opacity",
+    "rotation",
+  ],
   OptionsStructureDto: ["outline", "taggedPdf"],
   RenderLocalizationDto: ["locale", "timeZone", "currency"],
   OptionsSecurityDto: ["pdf", "signature", "download"],
   OptionsPdfSecurityDto: ["userPassword", "ownerPassword", "permissions"],
-  OptionsPdfPermissionsDto: ["printing", "copying", "modifying", "annotating", "fillingForms", "assembling"],
-  OptionsSignatureDto: ["enabled", "reason", "location", "contactInfo", "certSource", "timestamp"],
+  OptionsPdfPermissionsDto: [
+    "printing",
+    "copying",
+    "modifying",
+    "annotating",
+    "fillingForms",
+    "assembling",
+  ],
+  OptionsSignatureDto: [
+    "enabled",
+    "reason",
+    "location",
+    "contactInfo",
+    "certSource",
+    "timestamp",
+  ],
   OptionsDownloadSecurityDto: ["enabled", "password", "generate"],
   OptionsDeliveryDto: ["mode", "destinationIds"],
   // Review layer request DTOs (V2-A07) — mirrored by the SDK's *Params types.
@@ -189,7 +222,16 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "dueAt",
     "mentions",
   ],
-  UpdateCommentDto: ["severity", "assignedToUserId", "dueAt", "pageNumber", "x", "y", "width", "height"],
+  UpdateCommentDto: [
+    "severity",
+    "assignedToUserId",
+    "dueAt",
+    "pageNumber",
+    "x",
+    "y",
+    "width",
+    "height",
+  ],
   ReplyDto: ["body", "mentions"],
   MigrateCommentsDto: ["fromDocumentId"],
   ReviewPolicyDto: [
@@ -199,11 +241,32 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "allowApprovalWithOpenComments",
   ],
   ParticipantInputDto: ["userId", "externalEmail", "externalName", "role"],
-  CreateReviewDto: ["documentId", "title", "message", "dueAt", "policy", "participants"],
+  CreateReviewDto: [
+    "documentId",
+    "title",
+    "message",
+    "dueAt",
+    "policy",
+    "participants",
+  ],
   AddParticipantDto: ["userId", "externalEmail", "externalName", "role"],
   ApprovalDto: ["decision", "note", "approverUserId"],
-  ShareLinkPermissionsDto: ["canView", "canComment", "canDownload", "canApprove", "requireEmail", "allowedDomains"],
-  CreateShareLinkDto: ["targetType", "documentId", "reviewRequestId", "permissions", "password", "expiresAt"],
+  ShareLinkPermissionsDto: [
+    "canView",
+    "canComment",
+    "canDownload",
+    "canApprove",
+    "requireEmail",
+    "allowedDomains",
+  ],
+  CreateShareLinkDto: [
+    "targetType",
+    "documentId",
+    "reviewRequestId",
+    "permissions",
+    "password",
+    "expiresAt",
+  ],
   // Template proposals + environments request DTOs (Pillar 2, V2-B06).
   OpenProposalDto: [
     "fromDraft",
@@ -223,7 +286,15 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   PromotePinsDto: ["from", "templates"],
   RollbackDto: ["toDeploymentId"],
   // Deployments request DTO (Pillar 3, V2-C02). Apply takes no body (path param only).
-  PlanDeploymentDto: ["environment", "manifest", "files", "commitSha", "sourceRef", "source", "env"],
+  PlanDeploymentDto: [
+    "environment",
+    "manifest",
+    "files",
+    "commitSha",
+    "sourceRef",
+    "source",
+    "env",
+  ],
   // Smart Forms request DTOs (Phase D, V2-D06). Both carry just the field `data`.
   ValidateFormDto: ["data"],
   CreateSubmissionDto: ["data"],
@@ -239,7 +310,11 @@ test("openapi drift: the SDK covers exactly the public endpoint set", () => {
   const missing = [...expected].filter((e) => !actual.has(e));
   const unexpected = [...actual].filter((a) => !expected.has(a));
 
-  assert.deepEqual(missing, [], `SDK expects endpoints the spec no longer has: ${missing.join(", ")}`);
+  assert.deepEqual(
+    missing,
+    [],
+    `SDK expects endpoints the spec no longer has: ${missing.join(", ")}`,
+  );
   assert.deepEqual(
     unexpected,
     [],
@@ -248,9 +323,14 @@ test("openapi drift: the SDK covers exactly the public endpoint set", () => {
 });
 
 test("openapi drift: request-body DTO properties match the SDK types", () => {
-  for (const [schemaName, expectedProps] of Object.entries(EXPECTED_SCHEMA_PROPS)) {
+  for (const [schemaName, expectedProps] of Object.entries(
+    EXPECTED_SCHEMA_PROPS,
+  )) {
     const schema = spec.components.schemas[schemaName];
-    assert.ok(schema, `Spec is missing schema '${schemaName}' — did a DTO get renamed?`);
+    assert.ok(
+      schema,
+      `Spec is missing schema '${schemaName}' — did a DTO get renamed?`,
+    );
     const actual = Object.keys(schema.properties ?? {}).sort();
     assert.deepEqual(
       actual,
@@ -261,7 +341,9 @@ test("openapi drift: request-body DTO properties match the SDK types", () => {
 });
 
 test("openapi drift: the create endpoint still requires the x-api-key security scheme", () => {
-  const post = spec.paths["/v1/documents"]?.["post"] as { security?: unknown[] } | undefined;
+  const post = spec.paths["/v1/documents"]?.["post"] as
+    | { security?: unknown[] }
+    | undefined;
   assert.ok(post, "POST /v1/documents is missing from the spec");
   assert.ok(
     Array.isArray(post.security) && post.security.length > 0,

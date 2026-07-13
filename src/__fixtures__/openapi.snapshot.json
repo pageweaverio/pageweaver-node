@@ -25,7 +25,7 @@
           {
             "name": "Idempotency-Key",
             "in": "header",
-            "description": "Optional. A unique token you generate per document (for example a UUID) so a retried request returns the original document instead of creating a duplicate. This is not authentication. Equivalent to the `idempotencyKey` body field; if both are sent, this header wins.",
+            "description": "Optional. A unique token you generate per document (for example a UUID) so a retried request returns the original document instead of creating a duplicate. This is not authentication. Reuse it only for byte-for-byte equivalent render inputs: reusing it with a changed request returns 409. Equivalent to the `idempotencyKey` body field; if both are sent, this header wins.",
             "required": false,
             "schema": {
               "type": "string"
@@ -2625,6 +2625,37 @@
           "forms"
         ]
       }
+    },
+    "/v1/projects": {
+      "get": {
+        "description": "Lists the active account's document initiatives. Send `X-PageWeaver-Project` with a project id or slug to select the request context; omitting it selects the account's `default` project.",
+        "operationId": "ProjectsController_list",
+        "parameters": [
+          {
+            "name": "X-PageWeaver-Project",
+            "in": "header",
+            "description": "Account-local project id or slug for the request context. Omit it to use the account's `default` project.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List projects",
+        "tags": [
+          "projects"
+        ]
+      }
     }
   },
   "info": {
@@ -3205,7 +3236,7 @@
           },
           "idempotencyKey": {
             "type": "string",
-            "description": "Optional idempotency token you generate per document, so repeating a request returns the same document instead of creating a duplicate. This is not authentication. Prefer the `Idempotency-Key` header; this body field is a fallback for clients that cannot set headers. If both are sent, the header wins."
+            "description": "Optional idempotency token you generate per document, so repeating a request returns the same document instead of creating a duplicate. This is not authentication. Prefer the `Idempotency-Key` header; this body field is a fallback for clients that cannot set headers. Reusing a key with different render inputs returns 409. If both are sent, the header wins."
           },
           "callbackUrl": {
             "type": "string",

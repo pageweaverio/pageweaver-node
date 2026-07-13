@@ -10,6 +10,18 @@
 /** A terminal or in-flight document status. */
 export type DocumentStatus = "queued" | "rendering" | "done" | "failed";
 
+/** An account-owned document initiative (Phase 2A). Pass its id or slug as the SDK `project` option. */
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  status: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+  /** True when it matches the project context selected for this request. */
+  active: boolean;
+}
+
 // ─── options.* (the single nested per-render override key) ──────────────────────
 
 export interface PageOptions {
@@ -326,7 +338,12 @@ export interface ValidateDocumentResult {
 export type CreateSyncResult =
   | { kind: "pdf"; id: string | null; version: number | null; pdf: Uint8Array }
   | { kind: "document"; document: Document }
-  | { kind: "pending"; id: string; version: number | null; status: DocumentStatus };
+  | {
+      kind: "pending";
+      id: string;
+      version: number | null;
+      status: DocumentStatus;
+    };
 
 /**
  * A document's integrity fingerprint, present once it has finished rendering. Re-hash your copy of
@@ -804,10 +821,23 @@ export interface ListCommentsParams {
   limit?: number;
 }
 
-export type ReviewStatus = "open" | "completed" | "canceled" | "expired" | "superseded";
+export type ReviewStatus =
+  | "open"
+  | "completed"
+  | "canceled"
+  | "expired"
+  | "superseded";
 export type ParticipantRole = "reviewer" | "approver" | "observer";
-export type ParticipantStatus = "pending" | "viewed" | "commented" | "completed" | "declined";
-export type ApprovalDecision = "approved" | "rejected" | "approved_with_comments";
+export type ParticipantStatus =
+  | "pending"
+  | "viewed"
+  | "commented"
+  | "completed"
+  | "declined";
+export type ApprovalDecision =
+  | "approved"
+  | "rejected"
+  | "approved_with_comments";
 
 /** The completion policy for a review (null fields fall back to platform defaults). */
 export interface ReviewPolicy {
@@ -990,10 +1020,19 @@ export interface CommentMigrationRollup {
 // ── Template proposals (Pillar 2) ───────────────────────────────────────────────
 
 /** A proposal's lifecycle state. */
-export type ProposalStatus = "open" | "approved" | "promoted" | "rejected" | "superseded";
+export type ProposalStatus =
+  | "open"
+  | "approved"
+  | "promoted"
+  | "rejected"
+  | "superseded";
 
 /** The render-diff regression's progress for a proposal. */
-export type ProposalCheckStatus = "pending" | "running" | "completed" | "failed";
+export type ProposalCheckStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "failed";
 
 /** Line-level diff magnitude of two text blobs (added / removed lines). */
 export interface ProposalTextDiffStats {
@@ -1198,10 +1237,20 @@ export interface RollbackResult {
 
 // ── Deployments (Pillar 3, documents-as-code) ───────────────────────────────────
 
-export type DeploymentStatus = "planned" | "applying" | "succeeded" | "failed" | "rolled_back";
+export type DeploymentStatus =
+  | "planned"
+  | "applying"
+  | "succeeded"
+  | "failed"
+  | "rolled_back";
 export type DeploymentSource = "cli" | "github" | "portal";
 export type DeploymentAction = "create" | "update" | "delete" | "noop";
-export type DeploymentResourceType = "template" | "schema" | "environmentPin" | "webhook" | "schedule";
+export type DeploymentResourceType =
+  | "template"
+  | "schema"
+  | "environmentPin"
+  | "webhook"
+  | "schedule";
 
 /** One Terraform-style change line in a deployment plan. */
 export interface DeploymentChange {
