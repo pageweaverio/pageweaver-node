@@ -1018,6 +1018,57 @@ test("documents.create accepts an environment selector in the body", async () =>
   });
 });
 
+test("documents.create sends output.pdfa on the wire, including the 'none' opt-out", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_a", status: "queued", version: 1 }),
+    json(202, { id: "doc_b", status: "queued", version: 1 }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.documents.create({
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfa: "3b" },
+  });
+  // "none" is the escape hatch from a template that DEFAULTS to archival output, so it must reach
+  // the API rather than being treated as an absent value and dropped.
+  await pw.documents.create({
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfa: "none" },
+  });
+
+  assert.deepEqual(calls[0]?.body, {
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfa: "3b" },
+  });
+  assert.deepEqual(calls[1]?.body, {
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfa: "none" },
+  });
+});
+
+test("documents.get surfaces the archival level and the output notices", async () => {
+  const { fetch } = mockFetch([
+    json(200, {
+      id: "doc_a",
+      status: "done",
+      version: 1,
+      outputFormat: "pdf",
+      pdfa: "3b",
+      outputNotices: ["The `Author` metadata field is not written on a PDF/A document: ..."],
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const doc = await pw.documents.get("doc_a");
+  assert.equal(doc.pdfa, "3b");
+  assert.equal(doc.outputNotices?.length, 1);
+  assert.match(String(doc.outputNotices?.[0]), /Author/);
+});
+
 test("deployments.plan / list / get hit /v1/deployments with the idempotency header", async () => {
   const { fetch, calls } = mockFetch([
     json(202, {

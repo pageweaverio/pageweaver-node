@@ -147,6 +147,9 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "quality",
     "transparent",
     "optimizeForSpeed",
+    // Archival PDF/A conformance. Modeled on DocumentOutput.pdfa as `"2b" | "3b" | "none"` —
+    // deliberately NOT "1b", which the API refuses because the conversion cannot produce a valid one.
+    "pdfa",
   ],
   RenderOptionsDto: [
     "page",

@@ -179,11 +179,25 @@ export interface RenderOptions {
 // ─── POST /v1/documents ─────────────────────────────────────────────────────────
 
 /**
- * Output selector: produce a raster image (png/jpeg/webp) instead of a PDF. With only `width`, the
- * image height grows proportionally to fit the page; add `height` + `clip` for an exact crop.
- * `quality` is jpeg/webp compression; `transparent` gives a transparent background (png/webp).
+ * Archival PDF/A conformance level. Only b-level conformance is offered, and `"1b"` is deliberately
+ * absent: the conversion cannot produce a PDF/A-1b that passes validation, so it is not offered
+ * rather than offered and failing. Use `"3b"` when the document may later carry an embedded
+ * machine-readable payload.
  */
-export interface ImageOutput {
+export type PdfaLevel = "2b" | "3b";
+
+/**
+ * What a document request produces: a raster image instead of a PDF, and/or archival PDF/A
+ * conformance.
+ *
+ * **Image**: with only `width`, the image height grows proportionally to fit the page; add `height`
+ * + `clip` for an exact crop. `quality` is jpeg/webp compression; `transparent` gives a transparent
+ * background (png/webp).
+ *
+ * **PDF/A**: see {@link DocumentOutput.pdfa} for what the conversion changes. It is not free, and
+ * two of its effects are invisible in the produced document.
+ */
+export interface DocumentOutput {
   /** "pdf" (default) or a raster image format. */
   format?: "pdf" | "png" | "jpeg" | "webp";
   /** Viewport width in px. With only width set, the height grows proportionally. */
@@ -198,15 +212,35 @@ export interface ImageOutput {
   transparent?: boolean;
   /** Trade some image quality for a faster capture. */
   optimizeForSpeed?: boolean;
+  /**
+   * Produce an archival **PDF/A** document. `"none"` opts out of a template that defaults to
+   * archival output.
+   *
+   * Three things change, and two of them are invisible in the produced document:
+   * - **Link annotations do not survive.** Link text still looks like a link but does nothing.
+   * - **Text set with OpenType feature substitution stops being extractable** (most commonly
+   *   `font-variant-numeric: tabular-nums`). It looks identical but cannot be selected, searched, or
+   *   copied. So a PDF/A document is **not** a machine-readability guarantee.
+   * - **The `Author` metadata field is dropped**, because PDF/A cannot record it conformantly. The
+   *   API reports this in `outputNotices` on the document.
+   *
+   * Adds roughly 200ms plus 25ms per page. Cannot be combined with an image `format`, a PDF
+   * open-password, a digital signature, or a `url` render (each returns a 400).
+   */
+  pdfa?: PdfaLevel | "none";
 }
+
 
 interface CreateDocumentCommon {
   /** Data merged into the template/HTML via Liquid. */
   payload?: Record<string, unknown>;
   /** Per-render option overrides, nested under this one key. */
   options?: RenderOptions;
-  /** Produce a raster image instead of a PDF (template + inline renders only). */
-  output?: ImageOutput;
+  /**
+   * What this call produces: a raster image instead of a PDF (template + inline renders only),
+   * and/or archival PDF/A conformance.
+   */
+  output?: DocumentOutput;
   /**
    * A unique token you generate per document so a retried request returns the original
    * document instead of creating a duplicate. Sent as the `Idempotency-Key` header.
@@ -397,6 +431,16 @@ export interface Document {
   version: number | null;
   /** The output format this document produces: "pdf" (default), "png", "jpeg", or "webp". */
   outputFormat: string;
+  /**
+   * The archival conformance level this document was issued at, or null for a plain PDF. Set whether
+   * the level came from this call's `output.pdfa` or from the template's own default.
+   */
+  pdfa?: PdfaLevel | null;
+  /**
+   * What had to change to honor the request. Today the only entry says the `Author` metadata field
+   * was dropped, which a PDF/A document cannot carry conformantly. Absent when nothing was adjusted.
+   */
+  outputNotices?: string[];
   download?: DownloadInfo;
   /** Present when `status` is "failed". */
   error?: string;

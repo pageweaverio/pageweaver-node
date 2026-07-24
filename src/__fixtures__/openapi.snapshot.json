@@ -2756,6 +2756,16 @@
           "optimizeForSpeed": {
             "type": "boolean",
             "description": "Trade some image quality for a faster capture."
+          },
+          "pdfa": {
+            "type": "string",
+            "enum": [
+              "none",
+              "2b",
+              "3b"
+            ],
+            "description": "Archival PDF/A conformance. '2b' or '3b' produce a validated PDF/A; 'none' opts out of a template that defaults to archival output. Only b-level conformance is offered. Two consequences to know about: link annotations do not survive the conversion, and text set with OpenType feature substitution (for example `font-variant-numeric: tabular-nums`) stops being extractable, so a PDF/A document is not a searchability guarantee. The `Author` metadata field is dropped, because it cannot be written in a way the standard permits. Adds roughly 200ms plus 25ms per page. Cannot be combined with an image format, a PDF open-password, a digital signature, or a `url` render.",
+            "example": "3b"
           }
         }
       },
@@ -3197,7 +3207,7 @@
             "example": "https://example.com/report"
           },
           "output": {
-            "description": "Produce a raster image (png/jpeg/webp) instead of a PDF, with optional sizing / transparency / quality. Omit for the default PDF. Not compatible with a `url` render or with PDF-only options (digital signature, PDF open-password, tagged PDF).",
+            "description": "What this call produces. Use `format` for a raster image (png/jpeg/webp) instead of a PDF, with optional sizing / transparency / quality, and `pdfa` for archival PDF/A conformance. Omit for the default PDF. An image is not compatible with a `url` render or with PDF-only options (digital signature, PDF open-password, tagged PDF).",
             "example": {
               "format": "png",
               "width": 1200,
@@ -3804,19 +3814,6 @@
           }
         }
       },
-      "ProposalDecisionDto": {
-        "type": "object",
-        "properties": {
-          "note": {
-            "type": "string",
-            "description": "An optional note recorded with the decision (max 1000)."
-          },
-          "approverUserId": {
-            "type": "string",
-            "description": "Attribute the decision to a member who is a named approver on a review targeting this proposal. When omitted, the decision is an integration decision authorized by the key's deploy scope."
-          }
-        }
-      },
       "RunProposalChecksDto": {
         "type": "object",
         "properties": {
@@ -3829,8 +3826,8 @@
             "description": "Advisory allows changed output after review; strict makes changed fixture output a publish-readiness blocker."
           },
           "checks": {
-            "description": "Observable regression signals to evaluate. Hash equality is a strong pass signal; hash inequality remains informational.",
             "type": "array",
+            "description": "Observable regression signals to evaluate. Hash equality is a strong pass signal; hash inequality remains informational.",
             "items": {
               "type": "string",
               "enum": [
@@ -3849,6 +3846,19 @@
           "failOnErrors": {
             "type": "boolean",
             "description": "When false, fixture render/schema errors remain visible but do not block publish readiness."
+          }
+        }
+      },
+      "ProposalDecisionDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "An optional note recorded with the decision (max 1000)."
+          },
+          "approverUserId": {
+            "type": "string",
+            "description": "Attribute the decision to a member who is a named approver on a review targeting this proposal. When omitted, the decision is an integration decision authorized by the key's deploy scope."
           }
         }
       },

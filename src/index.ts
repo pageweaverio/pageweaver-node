@@ -54,6 +54,8 @@ export {
 export type {
   Project,
   DocumentStatus,
+  DocumentOutput,
+  PdfaLevel,
   RenderOptions,
   PageOptions,
   RenderingOptions,

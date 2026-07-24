@@ -87,6 +87,30 @@ await pw.documents.create({
 });
 ```
 
+### Archival PDF/A
+
+`output.pdfa` issues the document as a validated PDF/A, the format long-term archives and public-sector buyers ask for.
+
+```ts
+const doc = await pw.documents.createAndWait({
+  templateId: "tmpl_invoice",
+  payload,
+  output: { pdfa: "3b" }, // "2b" | "3b" | "none"
+});
+doc.pdfa; // "3b"
+doc.outputNotices; // what had to change to honor the request
+```
+
+`2b` and `3b` produce a validated PDF/A; `3b` is the one to choose when the document may later carry an embedded machine-readable payload. **`1b` is not offered** because the conversion cannot produce one that passes validation, and offering a level that fails a validator would be worse than not offering it. Send `"none"` to opt out of a template that defaults to archival output.
+
+Three things change, and two of them are invisible in the produced document:
+
+- **Links stop working.** Every clickable link annotation is dropped by the conversion. Link text still looks like a link.
+- **Some text stops being extractable.** Text set with OpenType feature substitution, most commonly `font-variant-numeric: tabular-nums`, looks identical but can no longer be selected, searched, or copied. Level b conformance does not require character mapping, so a PDF/A document is **not** a machine-readability guarantee.
+- **`Author` is not written**, because PDF/A cannot record it conformantly. Every other metadata field is written normally, and the drop is reported in `outputNotices`.
+
+It cannot be combined with an image `format`, a PDF open-password, a digital signature, or a `url` render (each returns a 400), and it adds roughly 200ms plus 25ms per page.
+
 ## Polling
 
 ```ts
