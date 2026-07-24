@@ -323,20 +323,29 @@ export interface EInvoice {
  */
 export interface DocumentOutput {
   /**
-   * `"pdf"` (default), a raster image format, or `"facturx"`.
+   * `"pdf"` (default), a raster image format, `"facturx"`, or `"ubl"`.
    *
    * `"facturx"` returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded,
    * so one file is both the human-readable PDF and the machine-readable invoice. It needs a template or
-   * inline render (not a `url`), is always PDF/A-3b, and cannot be signed or encrypted. The invoice data
-   * comes from the template version's e-invoice binding, or from an explicit {@link DocumentOutput.invoice}
-   * for an inline / one-off render (required when there is no binding).
+   * inline render (not a `url`), is always PDF/A-3b, and cannot be signed or encrypted.
+   *
+   * `"ubl"` returns a **standalone** EN 16931 UBL 2.1 invoice as pure XML (no PDF), for buyers who ingest
+   * the structured invoice directly. It also needs a template or inline render (not a `url`), and because
+   * it produces no PDF it cannot carry PDF/A, a digital signature, or a PDF open-password. Set
+   * {@link EInvoice.customizationId} / {@link EInvoice.profileId} on the invoice to tag it as Peppol BIS
+   * Billing 3.0.
+   *
+   * For both structured formats the invoice comes from the template version's e-invoice binding, or from
+   * an explicit {@link DocumentOutput.invoice} for an inline / one-off render (required when there is no
+   * binding).
    */
-  format?: "pdf" | "facturx" | "png" | "jpeg" | "webp";
+  format?: "pdf" | "facturx" | "ubl" | "png" | "jpeg" | "webp";
   /**
-   * Structured e-invoice data for a `facturx` render, as a canonical {@link EInvoice} object. Use it for
-   * an inline / one-off render that has no template binding, or to override the version's binding. It is
-   * validated against EN 16931 (a plausible-but-invalid invoice is rejected). Ignored unless `format` is
-   * `"facturx"`. You never supply the totals: they are computed from the lines.
+   * Structured e-invoice data for a `facturx` or `ubl` render, as a canonical {@link EInvoice} object.
+   * Use it for an inline / one-off render that has no template binding, or to override the version's
+   * binding. It is validated against EN 16931 (a plausible-but-invalid invoice is rejected). Ignored
+   * unless `format` is `"facturx"` or `"ubl"`. You never supply the totals: they are computed from the
+   * lines.
    */
   invoice?: EInvoice;
   /** Viewport width in px. With only width set, the height grows proportionally. */
@@ -568,7 +577,7 @@ export interface Document {
   id: string;
   status: DocumentStatus;
   version: number | null;
-  /** The output format this document produces: "pdf" (default), "facturx", "png", "jpeg", or "webp". */
+  /** The output format this document produces: "pdf" (default), "facturx", "ubl", "png", "jpeg", or "webp". */
   outputFormat: string;
   /**
    * The archival conformance level this document was issued at, or null for a plain PDF. Set whether
@@ -617,7 +626,7 @@ export interface DocumentListItem {
   version: number | null;
   status: DocumentStatus;
   source: string;
-  /** Output format: "pdf" | "facturx" | "png" | "jpeg" | "webp". */
+  /** Output format: "pdf" | "facturx" | "ubl" | "png" | "jpeg" | "webp". */
   outputFormat: string;
   pages: number | null;
   bytes: number | null;

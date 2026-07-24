@@ -117,6 +117,42 @@ test("documents.create sends a facturx output with an inline EInvoice", async ()
   assert.equal(body.output?.invoice?.invoiceNumber, "INV-2026-001");
 });
 
+test("documents.create sends a ubl output with Peppol profile ids on the inline invoice", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_ubl", status: "queued", version: 1 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
+
+  const res = await pw.documents.create({
+    templateId: "tmpl_invoice",
+    payload: { any: "thing" },
+    output: {
+      format: "ubl",
+      invoice: {
+        invoiceNumber: "INV-2026-002",
+        issueDate: "2026-07-25",
+        currency: "EUR",
+        customizationId: "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
+        profileId: "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0",
+        seller: { name: "Acme GmbH", vatId: "DE123456789", address: { countryCode: "DE" } },
+        buyer: { name: "Buyer SARL", address: { countryCode: "FR" } },
+        lines: [{ name: "Consulting", quantity: 1, netPrice: 500, vatCategory: "S", vatRate: 19 }],
+      },
+    },
+  });
+
+  assert.equal(res.id, "doc_ubl");
+  const call = calls[0];
+  assert.ok(call);
+  const body = call.body as { output?: { format?: string; invoice?: { profileId?: string } } };
+  assert.equal(body.output?.format, "ubl");
+  assert.equal(body.output?.invoice?.profileId, "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0");
+});
+
 test("projects.list selects the configured project context", async () => {
   const { fetch, calls } = mockFetch([json(200, [])]);
   const pw = new PageWeaver({

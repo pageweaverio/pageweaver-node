@@ -2722,16 +2722,17 @@
             "enum": [
               "pdf",
               "facturx",
+              "ubl",
               "png",
               "jpeg",
               "webp"
             ],
-            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document. 'facturx' returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded, so one file is both the human PDF and the machine-readable invoice. facturx needs a template or inline render (not a url), is always PDF/A-3b, cannot be signed or encrypted, and requires the invoice data from the template version's e-invoice binding or an explicit `invoice`."
+            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document. 'facturx' returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded, so one file is both the human PDF and the machine-readable invoice. 'ubl' returns a standalone EN 16931 UBL 2.1 invoice as pure XML (no PDF), for buyers who ingest the structured invoice directly. Both facturx and ubl need a template or inline render (not a url) and take the invoice from the template version's e-invoice binding or an explicit `invoice`; facturx is always PDF/A-3b and cannot be signed or encrypted, and ubl produces no PDF so it cannot carry PDF/A, a signature, or a PDF open-password."
           },
           "invoice": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Structured e-invoice data for a `facturx` render, as a canonical EN 16931 invoice object (invoiceNumber, issueDate, currency, seller, buyer, lines[], ...). Use this for inline / one-off renders that have no template binding, or to override the version's binding. Validated against EN 16931; a plausible-but-invalid invoice is rejected."
+            "description": "Structured e-invoice data for a `facturx` or `ubl` render, as a canonical EN 16931 invoice object (invoiceNumber, issueDate, currency, seller, buyer, lines[], ...). Use this for inline / one-off renders that have no template binding, or to override the version's binding. Validated against EN 16931; a plausible-but-invalid invoice is rejected. Set `customizationId` / `profileId` on the object to tag a `ubl` document as Peppol BIS Billing 3.0."
           },
           "width": {
             "type": "number",
