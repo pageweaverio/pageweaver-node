@@ -186,9 +186,133 @@ export interface RenderOptions {
  */
 export type PdfaLevel = "2b" | "3b";
 
+// ─── EN 16931 e-invoice (Factur-X) ──────────────────────────────────────────────
+//
+// The canonical invoice you pass as `output.invoice` for an inline `facturx` render. Field names map
+// 1:1 to EN 16931 business terms (BT-*) and groups (BG-*), so this is the "core invoice" the API maps
+// to CII XML and embeds in the PDF/A-3. Monetary amounts are plain numbers in the document currency's
+// major unit (e.g. euros, not cents); you supply prices and quantities, never the totals — every
+// rounding-sensitive total is computed from the lines server-side.
+
 /**
- * What a document request produces: a raster image instead of a PDF, and/or archival PDF/A
- * conformance.
+ * EN 16931 VAT category code (a subset of UNCL5305) — BT-151 on a line.
+ *  - `S`  Standard rate  ·  `Z`  Zero rated  ·  `E`  Exempt
+ *  - `AE` Reverse charge  ·  `K`  Intra-community supply  ·  `G`  Free export
+ *  - `O`  Outside scope  ·  `L`  Canary Islands IGIC  ·  `M`  Ceuta/Melilla IPSI
+ *
+ * The categories that mean "no VAT charged" (`Z`, `E`, `AE`, `K`, `G`, `O`) require a `vatRate` of 0,
+ * and several (`E`, `AE`, `K`, `G`, `O`) require an {@link EInvoice.exemptionReasons} entry.
+ */
+export type VatCategoryCode = "S" | "Z" | "E" | "AE" | "K" | "G" | "O" | "L" | "M";
+
+/** BG-5 (seller) / BG-8 (buyer) — a postal address. */
+export interface InvoiceAddress {
+  /** BT-35 / BT-50 — address line 1 (street). */
+  line1?: string;
+  /** BT-36 / BT-51 — address line 2. */
+  line2?: string;
+  /** BT-37 / BT-52 — city. */
+  city?: string;
+  /** BT-38 / BT-53 — post code. */
+  postalZone?: string;
+  /** BT-39 / BT-54 — country subdivision (state / province / county). */
+  subdivision?: string;
+  /** BT-40 / BT-55 — country code, ISO 3166-1 alpha-2 (e.g. `DE`). **Required** by EN 16931. */
+  countryCode: string;
+}
+
+/** BG-4 (seller) / BG-7 (buyer) — a trading party. */
+export interface InvoiceParty {
+  /** BT-27 (seller) / BT-44 (buyer) — the registered legal name. **Required.** */
+  name: string;
+  /** BT-28 (seller) / BT-45 (buyer) — a trading name, if different from the legal name. */
+  tradingName?: string;
+  /** BT-31 (seller) / BT-48 (buyer) — the VAT identifier, including the country prefix (e.g. `DE123456789`). */
+  vatId?: string;
+  /** BT-30 (seller) / BT-47 (buyer) — a legal registration id (company number). */
+  legalRegistrationId?: string;
+  /** BT-34 (seller) / BT-49 (buyer) — an electronic address (e.g. a Peppol endpoint). */
+  electronicAddress?: { value: string; schemeId?: string };
+  address: InvoiceAddress;
+}
+
+/** BG-25 — one invoice line. Derived amounts (line totals, VAT) are computed, never supplied. */
+export interface InvoiceLine {
+  /** BT-126 — the line identifier. Omit to let the server assign a 1-based sequence. */
+  id?: string;
+  /** BT-153 — the item name. **Required.** */
+  name: string;
+  /** BT-154 — an item description. */
+  description?: string;
+  /** BT-129 — the invoiced quantity. **Required.** */
+  quantity: number;
+  /** BT-130 — the unit of measure, a UN/ECE Rec 20 code (default `C62`, "one/piece"). */
+  unitCode?: string;
+  /** BT-146 — the net price of one unit (after any item discount), in the document currency. **Required.** */
+  netPrice: number;
+  /** BT-149 — the base quantity the net price applies to (default 1). */
+  baseQuantity?: number;
+  /** BT-151 — the line's VAT category code. **Required.** */
+  vatCategory: VatCategoryCode;
+  /** BT-152 — the line's VAT rate as a percentage, e.g. `19`. **Required** (0 for zero/exempt). */
+  vatRate: number;
+}
+
+/** BG-16 — payment terms, and optionally a single credit-transfer account (BG-17). */
+export interface InvoicePayment {
+  /** BT-20 — free-text payment terms. */
+  terms?: string;
+  /** BT-83 — a remittance / payment reference the payer should quote. */
+  reference?: string;
+  /** BG-17 — a credit-transfer IBAN the payment is due to. */
+  iban?: string;
+  /** BT-85 — the name of the payment account holder. */
+  accountName?: string;
+}
+
+/**
+ * A canonical EN 16931 invoice, passed as {@link DocumentOutput.invoice} for an inline `facturx` render.
+ * You never supply the totals — the server derives every rounding-sensitive amount from the lines.
+ */
+export interface EInvoice {
+  /** BT-1 — the invoice number. **Required**, unique per seller. */
+  invoiceNumber: string;
+  /** BT-2 — the issue date, ISO `YYYY-MM-DD`. **Required.** */
+  issueDate: string;
+  /** BT-9 — the payment due date, ISO `YYYY-MM-DD`. */
+  dueDate?: string;
+  /** BT-3 — the invoice type code (UNCL1001); default `380` (commercial invoice), `381` = credit note. */
+  typeCode?: string;
+  /** BT-5 — the document currency, ISO 4217 (e.g. `EUR`). **Required.** */
+  currency: string;
+  /** BT-10 — a buyer reference (often a purchase-order or cost-center key the buyer requires). */
+  buyerReference?: string;
+  /** BT-13 — the purchase order number this invoice relates to. */
+  purchaseOrderReference?: string;
+  /** BT-22 — a free-text note on the document. */
+  note?: string;
+  /** BG-4 — the seller. **Required.** */
+  seller: InvoiceParty;
+  /** BG-7 — the buyer. **Required.** */
+  buyer: InvoiceParty;
+  /** BG-25 — the invoice lines. **Required**, at least one. */
+  lines: InvoiceLine[];
+  /** BG-16 — payment details. */
+  payment?: InvoicePayment;
+  /**
+   * BT-96/BT-97/BT-121 — a VAT exemption reason keyed by category code, required by EN 16931 for the
+   * "no VAT" categories (`E`, `AE`, `K`, `G`, `O`). Applied to every breakdown group of that category.
+   */
+  exemptionReasons?: Partial<Record<VatCategoryCode, string>>;
+  /** The customization identifier. Defaults to plain EN 16931; usually leave it unset for Factur-X. */
+  customizationId?: string;
+  /** The profile identifier. Defaults to none; usually leave it unset for Factur-X. */
+  profileId?: string;
+}
+
+/**
+ * What a document request produces: a raster image instead of a PDF, a Factur-X e-invoice, and/or
+ * archival PDF/A conformance.
  *
  * **Image**: with only `width`, the image height grows proportionally to fit the page; add `height`
  * + `clip` for an exact crop. `quality` is jpeg/webp compression; `transparent` gives a transparent
@@ -198,8 +322,23 @@ export type PdfaLevel = "2b" | "3b";
  * two of its effects are invisible in the produced document.
  */
 export interface DocumentOutput {
-  /** "pdf" (default) or a raster image format. */
-  format?: "pdf" | "png" | "jpeg" | "webp";
+  /**
+   * `"pdf"` (default), a raster image format, or `"facturx"`.
+   *
+   * `"facturx"` returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded,
+   * so one file is both the human-readable PDF and the machine-readable invoice. It needs a template or
+   * inline render (not a `url`), is always PDF/A-3b, and cannot be signed or encrypted. The invoice data
+   * comes from the template version's e-invoice binding, or from an explicit {@link DocumentOutput.invoice}
+   * for an inline / one-off render (required when there is no binding).
+   */
+  format?: "pdf" | "facturx" | "png" | "jpeg" | "webp";
+  /**
+   * Structured e-invoice data for a `facturx` render, as a canonical {@link EInvoice} object. Use it for
+   * an inline / one-off render that has no template binding, or to override the version's binding. It is
+   * validated against EN 16931 (a plausible-but-invalid invoice is rejected). Ignored unless `format` is
+   * `"facturx"`. You never supply the totals: they are computed from the lines.
+   */
+  invoice?: EInvoice;
   /** Viewport width in px. With only width set, the height grows proportionally. */
   width?: number;
   /** Viewport height in px. Pair with `clip` for an exact crop. */
@@ -429,7 +568,7 @@ export interface Document {
   id: string;
   status: DocumentStatus;
   version: number | null;
-  /** The output format this document produces: "pdf" (default), "png", "jpeg", or "webp". */
+  /** The output format this document produces: "pdf" (default), "facturx", "png", "jpeg", or "webp". */
   outputFormat: string;
   /**
    * The archival conformance level this document was issued at, or null for a plain PDF. Set whether
@@ -478,7 +617,7 @@ export interface DocumentListItem {
   version: number | null;
   status: DocumentStatus;
   source: string;
-  /** Output format: "pdf" | "png" | "jpeg" | "webp". */
+  /** Output format: "pdf" | "facturx" | "png" | "jpeg" | "webp". */
   outputFormat: string;
   pages: number | null;
   bytes: number | null;

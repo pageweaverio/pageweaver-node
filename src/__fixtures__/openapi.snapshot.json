@@ -178,7 +178,7 @@
     },
     "/v1/documents/{id}": {
       "get": {
-        "description": "Poll a document. When status is 'done' the response includes a `download` block (a short-lived URL, or the password-gated content endpoint if the document is download-protected) plus `appliedOptions` (the per-render options it was created with).",
+        "description": "Poll a document. When status is 'done' the response includes a `download` block (a short-lived URL, or the password-gated content endpoint if the document is download-protected) plus `appliedOptions` (the per-render options it was created with).\n\nWith `Accept: application/pdf` a finished, unprotected document streams back as 200 with its bytes (the id is in the `X-Document-Id` header) instead of the JSON, so you can download it in one request. Any other Accept (or a document that is still rendering, failed, or download-protected) returns the normal JSON envelope.",
         "operationId": "RendersController_get",
         "parameters": [
           {
@@ -2721,11 +2721,17 @@
             "type": "string",
             "enum": [
               "pdf",
+              "facturx",
               "png",
               "jpeg",
               "webp"
             ],
-            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document."
+            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document. 'facturx' returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded, so one file is both the human PDF and the machine-readable invoice. facturx needs a template or inline render (not a url), is always PDF/A-3b, cannot be signed or encrypted, and requires the invoice data from the template version's e-invoice binding or an explicit `invoice`."
+          },
+          "invoice": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Structured e-invoice data for a `facturx` render, as a canonical EN 16931 invoice object (invoiceNumber, issueDate, currency, seller, buyer, lines[], ...). Use this for inline / one-off renders that have no template binding, or to override the version's binding. Validated against EN 16931; a plausible-but-invalid invoice is rejected."
           },
           "width": {
             "type": "number",

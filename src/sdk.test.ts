@@ -80,6 +80,43 @@ test("documents.create posts with auth + idempotency header and strips it from t
   });
 });
 
+test("documents.create sends a facturx output with an inline EInvoice", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_fx", status: "queued", version: 1 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test_abc",
+    baseUrl: "http://api.test",
+    fetch,
+  });
+
+  const res = await pw.documents.create({
+    templateId: "tmpl_invoice",
+    payload: { any: "thing" },
+    output: {
+      format: "facturx",
+      invoice: {
+        invoiceNumber: "INV-2026-001",
+        issueDate: "2026-07-25",
+        currency: "EUR",
+        seller: { name: "Acme GmbH", vatId: "DE123456789", address: { countryCode: "DE" } },
+        buyer: { name: "Buyer SARL", address: { countryCode: "FR" } },
+        lines: [
+          { name: "Consulting", quantity: 2, netPrice: 500, vatCategory: "S", vatRate: 19 },
+        ],
+      },
+    },
+  });
+
+  assert.equal(res.id, "doc_fx");
+  const call = calls[0];
+  assert.ok(call);
+  const body = call.body as { output?: { format?: string; invoice?: { invoiceNumber?: string } } };
+  assert.equal(body.output?.format, "facturx");
+  // The full canonical invoice travels in the body untouched.
+  assert.equal(body.output?.invoice?.invoiceNumber, "INV-2026-001");
+});
+
 test("projects.list selects the configured project context", async () => {
   const { fetch, calls } = mockFetch([json(200, [])]);
   const pw = new PageWeaver({

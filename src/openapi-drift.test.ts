@@ -141,6 +141,9 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   ],
   OutputDto: [
     "format",
+    // Structured e-invoice data for a `facturx` render (a canonical EN 16931 invoice object).
+    // Modeled on DocumentOutput.invoice as the hand-written EInvoice type.
+    "invoice",
     "width",
     "height",
     "clip",
