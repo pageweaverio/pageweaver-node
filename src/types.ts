@@ -441,8 +441,8 @@ export interface DocumentListItem {
   /** ISO 8601 timestamp. */
   createdAt: string;
   finishedAt: string | null;
-  pdfAvailable: boolean;
-  pdfExpiresAt: string | null;
+  contentAvailable: boolean;
+  contentExpiresAt: string | null;
   error: string | null;
 }
 
