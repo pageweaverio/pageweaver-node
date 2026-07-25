@@ -61,7 +61,7 @@
         ]
       },
       "get": {
-        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, createdAfter/createdBefore (ISO date-time, bounding creation time), and delivery (the webhook-delivery state of each document: 'undelivered' for documents that were subscribed to a webhook but never delivered successfully — the set to reconcile after an endpoint outage — plus 'failed', 'delivered', 'pending', 'skipped', or 'none' for documents with no webhook). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
+        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, batchId (scope to one bulk run's items, for per-item delivery reconciliation), createdAfter/createdBefore (ISO date-time, bounding creation time), and two independent delivery-channel filters. `delivery` reconciles the WEBHOOK channel and `storageDelivery` the direct-to-storage (BYOS) channel; each takes 'undelivered' (subscribed but never delivered successfully — the set to reconcile after an outage), 'failed', 'delivered', 'pending', 'skipped', or 'none'. Each item reports both channels' latest outcome (`delivery` / `storageDelivery`, with `deliveredAt` / `storageDeliveredAt`). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
         "operationId": "RendersController_list",
         "parameters": [
           {
@@ -74,6 +74,14 @@
           },
           {
             "name": "templateId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
             "required": true,
             "in": "query",
             "schema": {
@@ -114,6 +122,14 @@
           },
           {
             "name": "delivery",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "storageDelivery",
             "required": true,
             "in": "query",
             "schema": {
