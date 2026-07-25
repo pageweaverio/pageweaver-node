@@ -140,6 +140,12 @@ export class DocumentsResource {
       query: {
         status: params.status,
         templateId: params.templateId,
+        batchId: params.batchId,
+        createdAfter: params.createdAfter,
+        createdBefore: params.createdBefore,
+        delivery: params.delivery,
+        storageDelivery: params.storageDelivery,
+        include: params.include,
         cursor: params.cursor,
         limit: params.limit,
       },

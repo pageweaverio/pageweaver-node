@@ -640,11 +640,41 @@ export interface DocumentListItem {
   contentAvailable: boolean;
   contentExpiresAt: string | null;
   error: string | null;
+  /**
+   * Latest WEBHOOK delivery outcome (D67): "delivered" | "failed" | "skipped" | "pending", or null when
+   * this document was never subscribed to a webhook. Use for per-item delivery reconciliation.
+   */
+  delivery: string | null;
+  /** ISO 8601 time the webhook delivery outcome was recorded; null if never subscribed (E11). */
+  deliveredAt: string | null;
+  /**
+   * Latest direct-to-storage (BYOS) delivery outcome (D96/E11): "delivered" | "failed" | "skipped" |
+   * "pending", or null when no storage destination applied. Reconcile independently of `delivery`.
+   */
+  storageDelivery: string | null;
+  /** ISO 8601 time the storage delivery outcome was recorded; null if none applied (E11). */
+  storageDeliveredAt: string | null;
+  /** Short-lived signed download URL — present only when `include: "url"` was passed and the PDF is retained. */
+  url?: string;
 }
 
 export interface ListDocumentsParams {
   status?: DocumentStatus;
   templateId?: string;
+  /** Scope the list to one bulk run's items, for per-item delivery reconciliation (E11). */
+  batchId?: string;
+  /** ISO 8601 lower/upper bounds on creation time. */
+  createdAfter?: string;
+  createdBefore?: string;
+  /**
+   * Reconcile the WEBHOOK channel: "undelivered" (subscribed but never delivered), "failed",
+   * "delivered", "pending", "skipped", or "none" (no webhook).
+   */
+  delivery?: string;
+  /** Reconcile the direct-to-storage (BYOS) channel — same values as `delivery` (E11). */
+  storageDelivery?: string;
+  /** Pass "url" to attach a short-lived signed download URL to each finished, retained document. */
+  include?: string;
   cursor?: string;
   /** 1 to 100, default 25. */
   limit?: number;

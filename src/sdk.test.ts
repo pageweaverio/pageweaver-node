@@ -412,6 +412,20 @@ test("documents.list serializes query params", async () => {
   );
 });
 
+test("documents.list reconciles a batch's per-item delivery across both channels (E11)", async () => {
+  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.documents.list({ batchId: "bat_1", delivery: "undelivered", storageDelivery: "failed" });
+
+  const call = calls[0];
+  assert.ok(call);
+  assert.equal(
+    call.url,
+    "http://api.test/v1/documents?batchId=bat_1&delivery=undelivered&storageDelivery=failed",
+  );
+});
+
 test("documents.verify calls the verify endpoint with auth", async () => {
   const { fetch, calls } = mockFetch([
     json(200, {
