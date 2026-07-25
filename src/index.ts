@@ -82,6 +82,8 @@ export type {
   DocumentIntegrity,
   DocumentReviewSummary,
   DocumentVerification,
+  DocumentAccessibility,
+  AccessibilityViolation,
   DocumentListItem,
   ListDocumentsParams,
   DocumentPage,

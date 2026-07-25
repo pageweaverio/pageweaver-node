@@ -260,6 +260,36 @@
         ]
       }
     },
+    "/v1/documents/{id}/accessibility": {
+      "get": {
+        "description": "Return the full PDF/UA-1 conformance report for a document created with `output.pdfUa`: the reference validator's verdict, every rule that failed with its ISO 14289-1 clause, and what the pipeline adjusted to make the document conformant (the role map, link descriptions, and the page furniture marked as an artifact). This is the evidence an accessibility audit or a procurement review asks for. Returns 409 for a document that was not produced as an accessible one, or whose report has passed its retention window.",
+        "operationId": "RendersController_accessibility",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a document's accessibility report",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/{id}/receipt": {
       "get": {
         "description": "Return a signed provenance receipt for a completed document: an HMAC-signed JSON bundle binding the file to the request that produced it (`requestHash`), the pinned template version it was rendered against (`artifactHash`), who triggered it (`identity`), when it was issued, and the content fingerprint plus hash-chain link. A downstream party verifies it offline against the published key, without an API call. Available on paid plans; a completed document only.",
@@ -2807,6 +2837,24 @@
             ],
             "description": "Archival PDF/A conformance. '2b' or '3b' produce a validated PDF/A; 'none' opts out of a template that defaults to archival output. Only b-level conformance is offered. Two consequences to know about: link annotations do not survive the conversion, and text set with OpenType feature substitution (for example `font-variant-numeric: tabular-nums`) stops being extractable, so a PDF/A document is not a searchability guarantee. The `Author` metadata field is dropped, because it cannot be written in a way the standard permits. Adds roughly 200ms plus 25ms per page. Cannot be combined with an image format, a PDF open-password, a digital signature, or a `url` render.",
             "example": "3b"
+          },
+          "pdfUa": {
+            "type": "string",
+            "enum": [
+              "none",
+              "1"
+            ],
+            "description": "Accessible PDF/UA-1 output: a tagged document with a reading order, table headers, and described images, checked against the standard by the veraPDF reference validator before it is issued. '1' produces it; 'none' opts out of a template that defaults to it. Conformance depends on your markup, not only on this switch: every image needs alt text, headings must not skip levels, tables need header cells, and the document needs a language and a title. Cannot be combined with a watermark, a PDF open-password, a digital signature, PDF/A, an image format, or a `url` render.",
+            "example": "1"
+          },
+          "conformance": {
+            "type": "string",
+            "enum": [
+              "require",
+              "attempt"
+            ],
+            "description": "What happens when an accessible document does not conform. 'require' (the default) fails the document and tells you which rules it broke, so a document you receive has always been checked. 'attempt' returns the document anyway with the violations listed, which is useful while you are still adjusting a template. Only meaningful with `pdfUa`.",
+            "example": "require"
           }
         }
       },

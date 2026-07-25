@@ -1156,6 +1156,83 @@ test("documents.get surfaces the archival level and the output notices", async (
   assert.match(String(doc.outputNotices?.[0]), /Author/);
 });
 
+test("documents.create sends output.pdfUa and the conformance mode on the wire", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_a", status: "queued", version: 1 }),
+    json(202, { id: "doc_b", status: "queued", version: 1 }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  await pw.documents.create({
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfUa: "1", conformance: "attempt" },
+  });
+  // Like pdfa, "none" is the escape hatch from a template that DEFAULTS to accessible output, so it
+  // has to reach the API instead of being dropped as if it were absent.
+  await pw.documents.create({
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfUa: "none" },
+  });
+
+  assert.deepEqual(calls[0]?.body, {
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfUa: "1", conformance: "attempt" },
+  });
+  assert.deepEqual(calls[1]?.body, {
+    templateId: "tmpl_x",
+    payload: { total: 1 },
+    output: { pdfUa: "none" },
+  });
+});
+
+test("documents.accessibility fetches the conformance report", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, {
+      standard: "PDF/UA-1",
+      conformant: false,
+      mode: "attempt",
+      validator: "veraPDF 1.30.2",
+      violations: [
+        {
+          source: "validator",
+          rule: "ISO 14289-1:7.3-1",
+          clause: "7.3 test 1",
+          message: "Figure structure element has no alternate description",
+          count: 2,
+        },
+      ],
+      remediation: ["labeled 1 link annotation(s)"],
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const report = await pw.documents.accessibility("doc_a");
+  assert.equal(calls[0]?.url, "http://api.test/v1/documents/doc_a/accessibility");
+  assert.equal(report.conformant, false);
+  assert.equal(report.violations?.[0]?.clause, "7.3 test 1");
+  assert.equal(report.violations?.[0]?.count, 2);
+});
+
+test("documents.get surfaces the accessibility verdict", async () => {
+  const { fetch } = mockFetch([
+    json(200, {
+      id: "doc_a",
+      status: "done",
+      version: 1,
+      outputFormat: "pdf",
+      accessibility: { standard: "PDF/UA-1", conformant: true, reportAvailable: true },
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test_abc", baseUrl: "http://api.test", fetch });
+
+  const doc = await pw.documents.get("doc_a");
+  assert.equal(doc.accessibility?.conformant, true);
+  assert.equal(doc.accessibility?.standard, "PDF/UA-1");
+});
+
 test("deployments.plan / list / get hit /v1/deployments with the idempotency header", async () => {
   const { fetch, calls } = mockFetch([
     json(202, {

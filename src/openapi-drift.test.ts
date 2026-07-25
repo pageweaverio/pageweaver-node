@@ -33,6 +33,7 @@ const EXPECTED_ENDPOINTS: string[] = [
   "get /v1/documents",
   "get /v1/documents/{id}",
   "get /v1/documents/{id}/verify",
+  "get /v1/documents/{id}/accessibility",
   "get /v1/documents/{id}/receipt",
   "get /v1/documents/{id}/proof",
   "post /v1/documents/{id}/regenerate",
@@ -155,6 +156,11 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     // Archival PDF/A conformance. Modeled on DocumentOutput.pdfa as `"2b" | "3b" | "none"` —
     // deliberately NOT "1b", which the API refuses because the conversion cannot produce a valid one.
     "pdfa",
+    // Accessible PDF/UA-1 conformance. Modeled on DocumentOutput.pdfUa as `"1" | "none"` — one level,
+    // because PDF/UA-2 needs PDF 2.0, which the renderer does not emit.
+    "pdfUa",
+    // How a non-conformant accessible document is handled. DocumentOutput.conformance.
+    "conformance",
   ],
   RenderOptionsDto: [
     "page",

@@ -408,6 +408,28 @@ export interface DocumentOutput {
    * open-password, a digital signature, or a `url` render (each returns a 400).
    */
   pdfa?: PdfaLevel | "none";
+  /**
+   * Produce an **accessible PDF/UA-1** document: tagged, with a reading order, table headers, and
+   * described images, validated against the standard by the veraPDF reference validator before it is
+   * issued. `"none"` opts out of a template that defaults to accessible output.
+   *
+   * Conformance depends on your MARKUP, not only on asking for it. Every image needs alt text (an
+   * empty `alt` is not accepted), inline SVG needs `role="img"` + `aria-label`, headings must not skip
+   * levels, tables need `<th>` cells, and the document needs a language and a title. What is
+   * mechanical (the role map, link descriptions, the document language, and marking running headers
+   * and footers as artifacts) is handled for you.
+   *
+   * Cannot be combined with a watermark, a PDF open-password, a digital signature, PDF/A, an image
+   * `format`, or a `url` render (each returns a 400).
+   */
+  pdfUa?: "1" | "none";
+  /**
+   * What happens when an accessible document does not conform. `"require"` (the default) fails the
+   * document and names the rules it broke, so a document you receive has always been checked.
+   * `"attempt"` returns it anyway with the violations listed, which is what you want while adjusting a
+   * template. Only meaningful with {@link DocumentOutput.pdfUa}.
+   */
+  conformance?: "require" | "attempt";
 }
 
 
@@ -604,6 +626,42 @@ export interface DocumentReviewSummary {
   approvals: number;
 }
 
+/** Accessibility conformance for a document, and the `GET /v1/documents/:id/accessibility` body. */
+export interface DocumentAccessibility {
+  /** The standard claimed, e.g. "PDF/UA-1". */
+  standard: string;
+  /** The validator's verdict on this document; null while it is still rendering. */
+  conformant: boolean | null;
+  /** How a non-conformant result was handled: "require" or "attempt". */
+  mode?: string;
+  /** The validator that gave the verdict, e.g. "veraPDF 1.30.2". */
+  validator?: string;
+  /** Every rule violation, with the ISO clause or the authoring mistake behind it. */
+  violations?: AccessibilityViolation[];
+  /** What the pipeline adjusted to make the document conformant. */
+  remediation?: string[];
+  /** ISO-8601 time the verdict was recorded. */
+  checkedAt?: string;
+  /** Whether the stored report is still retrievable (it follows the document's retention). */
+  reportAvailable?: boolean;
+}
+
+/** One accessibility problem: an authoring mistake, or a rule the validator failed. */
+export interface AccessibilityViolation {
+  /** Where it was found: "preflight" (your HTML) or "validator" (the produced PDF). */
+  source: string;
+  /** Stable machine id, e.g. `image-missing-alt` or `ISO 14289-1:7.3-1`. */
+  rule: string;
+  /** What is wrong, addressed to whoever can fix it. */
+  message: string;
+  /** How many times it occurs. */
+  count: number;
+  /** The offending markup, trimmed. Preflight findings only. */
+  snippet?: string;
+  /** ISO 14289-1 clause and test number. Validator findings only. */
+  clause?: string;
+}
+
 /** The `GET /v1/documents/:id` body. */
 export interface Document {
   id: string;
@@ -616,6 +674,14 @@ export interface Document {
    * the level came from this call's `output.pdfa` or from the template's own default.
    */
   pdfa?: PdfaLevel | null;
+  /**
+   * Accessible conformance, present when the document was issued as PDF/UA. `conformant` is the
+   * reference validator's verdict on THIS document (null while it is still rendering), because
+   * conformance is decided by the template's markup and not only by asking for it. Fetch the full
+   * report, with every failed rule and its ISO 14289-1 clause, from
+   * `GET /v1/documents/:id/accessibility`.
+   */
+  accessibility?: DocumentAccessibility | null;
   /**
    * What had to change to honor the request. Two kinds of entry appear: the `Author` metadata field
    * being dropped, which a PDF/A document cannot carry conformantly; and, for a structured e-invoice

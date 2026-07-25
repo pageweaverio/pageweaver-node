@@ -10,6 +10,7 @@ import type {
   DocumentPageInfo,
   DocumentStatus,
   DocumentVerification,
+  DocumentAccessibility,
   ProvenanceReceipt,
   ListDocumentsParams,
   MigrateCommentsParams,
@@ -102,6 +103,21 @@ export class DocumentsResource {
     return this.http.json<DocumentVerification>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/verify`,
+      { signal },
+    );
+  }
+
+  /**
+   * Fetch the full PDF/UA-1 conformance report for a document created with `output.pdfUa`: the
+   * reference validator's verdict, every rule that failed with its ISO 14289-1 clause, and what the
+   * pipeline adjusted to make the document conformant. This is the evidence an accessibility audit or
+   * a procurement response asks for. Returns 409 for a document that was not produced as an accessible
+   * one, or whose report has passed its retention window.
+   */
+  accessibility(id: string, signal?: AbortSignal): Promise<DocumentAccessibility> {
+    return this.http.json<DocumentAccessibility>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/accessibility`,
       { signal },
     );
   }

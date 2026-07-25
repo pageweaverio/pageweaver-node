@@ -111,6 +111,29 @@ Three things change, and two of them are invisible in the produced document:
 
 It cannot be combined with an image `format`, a PDF open-password, a digital signature, or a `url` render (each returns a 400), and it adds roughly 200ms plus 25ms per page.
 
+### Accessible PDF/UA
+
+`output.pdfUa` issues a tagged, screen-reader-ready document that is validated against **PDF/UA-1** (ISO 14289-1) by the veraPDF reference validator before it is released. This is the standard EN 301 549 and Section 508 procurement point at.
+
+```ts
+const doc = await pw.documents.createAndWait({
+  templateId: "tmpl_invoice",
+  payload,
+  output: { pdfUa: "1" }, // "1" | "none"
+});
+doc.accessibility; // { standard: "PDF/UA-1", conformant: true, reportAvailable: true }
+
+const report = await pw.documents.accessibility(doc.id); // every rule, with its ISO clause
+```
+
+**Conformance depends on your markup, not only on asking for it.** A tagged PDF is built from the semantics of your HTML, so your template needs to: set a language on `<html>`, have a title, give every image real alt text (an empty `alt` is not accepted, use a CSS background for decoration), label inline SVG with `role="img"` + `aria-label`, keep headings in order starting at `<h1>`, and use `<th>` cells in tables. The mechanical parts are handled for you: the role map, link descriptions, the document language, marking running headers and footers as artifacts, and the conformance declaration.
+
+By default a document that does not conform is a **failed** document, so anything you receive with the claim has been checked. Pass `conformance: "attempt"` while you are still adjusting a template to get the document anyway with the violations listed.
+
+A **large-print variant** is the same template and payload with `options.page.scale`, and is validated the same way.
+
+It cannot be combined with a watermark, a PDF open-password, a digital signature, PDF/A, an image `format`, or a `url` render (each returns a 400).
+
 ## Polling
 
 ```ts
