@@ -139,6 +139,8 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "schemaId",
     "schemaVersion",
   ],
+  // Regenerate replay mode (E13) — mirrored by documents.regenerate({ mode }).
+  RegenerateDocumentDto: ["mode"],
   OutputDto: [
     "format",
     // Structured e-invoice data for a `facturx` render (a canonical EN 16931 invoice object).

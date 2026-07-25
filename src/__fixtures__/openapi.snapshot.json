@@ -320,7 +320,7 @@
     },
     "/v1/documents/{id}/regenerate": {
       "post": {
-        "description": "Faithfully replay a prior document: the SAME version (or inline source), payload, options, and download protection. Regenerate cannot overwrite anything — it takes no request body (a non-empty body is rejected with 400) and returns a new document id (202), counting as a new render.",
+        "description": "Replay a prior document, counting as a new render (202 with a new document id). The optional `mode` chooses how: 'exact' (default) faithfully reproduces it (same pinned version, payload, options, output format, PDF/A level); 'current' re-runs the same inputs against the template's LATEST published version. Regenerate never overwrites your inputs — `mode` is the only accepted field, and a different version is only ever used when you explicitly ask for 'current'.",
         "operationId": "RendersController_regenerate",
         "parameters": [
           {
@@ -332,6 +332,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegenerateDocumentDto"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "description": ""
@@ -3367,6 +3377,19 @@
             "type": "number",
             "description": "Pin a published SCHEMA version (requires schemaId); defaults to that schema's latest.",
             "minimum": 1
+          }
+        }
+      },
+      "RegenerateDocumentDto": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "current"
+            ],
+            "description": "Replay mode. 'exact' (default) faithfully reproduces the original document: the SAME pinned version, payload, options, output format, and PDF/A level. 'current' re-runs the same inputs against the template's LATEST published version, with that version's own frozen settings — for checking whether the input still works against your current template. 'current' needs a template-based document (an inline or url render has no version to advance)."
           }
         }
       },

@@ -173,14 +173,20 @@ export class DocumentsResource {
   }
 
   /**
-   * Faithfully replay a prior document: the same version (or inline source), payload, options, and
-   * download protection. Returns a new document id (`202`); counts as a new render.
+   * Replay a prior document, counting as a new render (`202` with a new id). `opts.mode` chooses how:
+   * `"exact"` (default) faithfully reproduces it (same pinned version, payload, options, output format,
+   * PDF/A level); `"current"` re-runs the same inputs against the template's latest published version.
+   * A different version is only ever used when you explicitly pass `"current"`, which needs a
+   * template-based document.
    */
-  regenerate(id: string, signal?: AbortSignal): Promise<CreateDocumentResult> {
+  regenerate(
+    id: string,
+    opts: { mode?: "exact" | "current"; signal?: AbortSignal } = {},
+  ): Promise<CreateDocumentResult> {
     return this.http.json<CreateDocumentResult>(
       "POST",
       `/v1/documents/${encodeURIComponent(id)}/regenerate`,
-      { signal },
+      { body: opts.mode ? { mode: opts.mode } : {}, signal: opts.signal },
     );
   }
 

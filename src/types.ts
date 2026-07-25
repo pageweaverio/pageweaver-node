@@ -602,6 +602,29 @@ export interface Document {
   integrity?: DocumentIntegrity | null;
   /** Review activity (thread counts, active review, approval tally); null when untouched by reviews. */
   review?: DocumentReviewSummary | null;
+  /**
+   * Per-attempt failure history, most recent first. Present only when the document has failed attempts
+   * (a clean render omits it) — the "why did this fail, and can I retry it" view.
+   */
+  attempts?: RenderAttempt[];
+}
+
+/** One failed render attempt in a document's failure history. */
+export interface RenderAttempt {
+  /** 1-based attempt number. */
+  attempt: number;
+  /** The pipeline stage it failed at: source | render | gate | pdfa | sign | einvoice | storage | unknown. */
+  stage: string;
+  /** Error classification: timeout | gotenberg | validation | conversion | signing | limit | storage | internal | unknown. */
+  classification: string;
+  /** Whether this class of failure is typically transient (a retry might succeed). */
+  retryable: boolean;
+  /** Sanitized failure message. */
+  error: string;
+  /** Attempt wall-clock in ms, when derivable. */
+  durationMs: number | null;
+  /** ISO 8601 time the attempt failed. */
+  failedAt: string;
 }
 
 /** The `GET /v1/documents/:id/verify` body: tamper-evidence + hash-chain attestation. */
