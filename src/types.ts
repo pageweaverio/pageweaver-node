@@ -1447,6 +1447,25 @@ export interface Environment {
   isProduction: boolean;
   pinCount: number;
   createdAt: string;
+  /**
+   * Continuous drift status (E12): "drifted" (OutOfSync) when the live pins diverged from what the last
+   * deployment established (an out-of-band change), "in_sync" (Synced) when they match, or "unknown"
+   * before the environment has a deployment baseline. Recomputed by a background reconciler, so it
+   * reflects a manual pin change with no CLI run.
+   */
+  driftStatus: "in_sync" | "drifted" | "unknown";
+  /** When the reconciler last evaluated this environment (ISO 8601); null before its first pass. */
+  driftCheckedAt: string | null;
+  /** Per-template drift detail (present once drift has been computed). */
+  driftDetail: {
+    driftedCount: number;
+    resources: {
+      templateId: string;
+      desiredVersion: number | null;
+      actualVersion: number | null;
+      state: "in_sync" | "changed" | "added" | "removed";
+    }[];
+  } | null;
 }
 
 /** One template → published-version pointer in an environment. */
