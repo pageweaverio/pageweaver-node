@@ -68,6 +68,8 @@ export type {
   PdfSecurityOptions,
   PdfPermissions,
   DownloadSecurityOptions,
+  DeliveryOptions,
+  EmailDeliveryOptions,
   CreateDocumentParams,
   CreateFromTemplateParams,
   CreateFromInlineParams,

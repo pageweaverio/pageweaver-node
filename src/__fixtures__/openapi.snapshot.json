@@ -61,7 +61,7 @@
         ]
       },
       "get": {
-        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, batchId (scope to one bulk run's items, for per-item delivery reconciliation), createdAfter/createdBefore (ISO date-time, bounding creation time), and two independent delivery-channel filters. `delivery` reconciles the WEBHOOK channel and `storageDelivery` the direct-to-storage (BYOS) channel; each takes 'undelivered' (subscribed but never delivered successfully — the set to reconcile after an outage), 'failed', 'delivered', 'pending', 'skipped', or 'none'. Each item reports both channels' latest outcome (`delivery` / `storageDelivery`, with `deliveredAt` / `storageDeliveredAt`). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
+        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, batchId (scope to one bulk run's items, for per-item delivery reconciliation), createdAfter/createdBefore (ISO date-time, bounding creation time), and two independent delivery-channel filters. `delivery` reconciles the WEBHOOK channel, `storageDelivery` the direct-to-storage (BYOS) channel, and `emailDelivery` the email-to-recipient channel; each takes 'undelivered' (configured but never delivered successfully — the set to reconcile after an outage), 'failed', 'delivered', 'pending', 'skipped', or 'none'. Each item reports all three channels' latest outcome (`delivery` / `storageDelivery` / `emailDelivery`, with `deliveredAt` / `storageDeliveredAt` / `emailDeliveredAt`). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
         "operationId": "RendersController_list",
         "parameters": [
           {
@@ -130,6 +130,14 @@
           },
           {
             "name": "storageDelivery",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "emailDelivery",
             "required": true,
             "in": "query",
             "schema": {
@@ -3120,6 +3128,58 @@
           }
         }
       },
+      "OptionsDeliveryEmailDto": {
+        "type": "object",
+        "properties": {
+          "to": {
+            "description": "Recipient addresses. Each entry may be a literal address or a Liquid expression over this document's payload (for example `{{ customer.email }}`), so one template can reach a different recipient per document in a bulk run. An expression that resolves to nothing is skipped, not an error. Required.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cc": {
+            "description": "Copy recipients. Same Liquid support as `to`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bcc": {
+            "description": "Blind-copy recipients. Same Liquid support as `to`.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject line. Liquid over the payload, for example `Invoice {{ invoiceNumber }}`. Defaults to a generic subject.",
+            "maxLength": 200
+          },
+          "body": {
+            "type": "string",
+            "description": "Plain-text message body. Liquid over the payload. In `link` mode `{{ _document.url }}` resolves to the download link. Defaults to a short generic message.",
+            "maxLength": 5000
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "attach",
+              "link"
+            ],
+            "description": "`attach` sends the document as an attachment; `link` sends a short-lived download link instead. Defaults to `attach`. A download-protected document is always sent as a link."
+          },
+          "attachmentName": {
+            "type": "string",
+            "description": "Attachment filename. Liquid over the payload, for example `invoice-{{ invoiceNumber }}`. The correct file extension is added automatically.",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "to"
+        ]
+      },
       "OptionsDeliveryDto": {
         "type": "object",
         "properties": {
@@ -3138,6 +3198,14 @@
             "items": {
               "type": "string"
             }
+          },
+          "email": {
+            "description": "Email this document to end recipients. Replaces the template's email-delivery setting for this document (it is not merged into it, so a recipient list is never half-applied). Requires a plan with email delivery; recipients are subject to your workspace's allowed domains, the per-document recipient cap, and your monthly send budget.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OptionsDeliveryEmailDto"
+              }
+            ]
           }
         }
       },

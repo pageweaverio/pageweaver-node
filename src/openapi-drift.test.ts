@@ -208,7 +208,8 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "timestamp",
   ],
   OptionsDownloadSecurityDto: ["enabled", "password", "generate"],
-  OptionsDeliveryDto: ["mode", "destinationIds"],
+  OptionsDeliveryDto: ["mode", "destinationIds", "email"],
+  OptionsDeliveryEmailDto: ["to", "cc", "bcc", "subject", "body", "mode", "attachmentName"],
   // Review layer request DTOs (V2-A07) — mirrored by the SDK's *Params types.
   MentionDto: ["userId", "offset"],
   CreateCommentDto: [

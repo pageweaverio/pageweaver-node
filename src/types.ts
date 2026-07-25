@@ -154,9 +154,41 @@ export interface SecurityOptions {
  * delivery setting for this render. `mode`: "all" = every enabled destination; "none" = don't deliver
  * this document; "selected" = only `destinationIds`. Ids your account doesn't own are ignored.
  */
+/**
+ * Email a finished document to end recipients, under `options.delivery.email` (E14).
+ *
+ * Every string field is Liquid over THIS document's payload, so one template reaches a different
+ * person per document: `to: ["{{ customer.email }}"]` over a 500-row bulk run mails 500 customers.
+ * An expression that resolves to nothing is skipped rather than failing the document.
+ *
+ * This REPLACES the template's email-delivery setting for this render; it is not merged into it.
+ * Requires a plan with email delivery, and recipients are subject to your workspace's allowed
+ * domains, the per-document recipient cap, and your monthly send budget. Anything a rule rejects is
+ * recorded on the document rather than silently dropped.
+ */
+export interface EmailDeliveryOptions {
+  /** Recipient addresses or Liquid expressions. Required. */
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  /** Liquid subject line. Defaults to a generic subject. */
+  subject?: string;
+  /** Liquid plain-text body. In "link" mode, `{{ _document.url }}` resolves to the download link. */
+  body?: string;
+  /**
+   * "attach" sends the document as an attachment; "link" sends a short-lived download link instead.
+   * Defaults to "attach". A download-protected document is always sent as a link.
+   */
+  mode?: "attach" | "link";
+  /** Liquid attachment filename. The correct extension is added automatically. */
+  attachmentName?: string;
+}
+
 export interface DeliveryOptions {
   mode?: "all" | "none" | "selected";
   destinationIds?: string[];
+  /** Email this document to end recipients (E14). */
+  email?: EmailDeliveryOptions;
 }
 
 /**
