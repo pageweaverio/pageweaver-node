@@ -132,7 +132,7 @@ By default a document that does not conform is a **failed** document, so anythin
 
 A **large-print variant** is the same template and payload with `options.page.scale`, and is validated the same way.
 
-It cannot be combined with a watermark, a PDF open-password, a digital signature, PDF/A, an image `format`, or a `url` render (each returns a 400).
+A **digital signature** works alongside it: the conformance check runs on the signed document, so the verdict covers the file you receive. It cannot be combined with a watermark, a PDF open-password, PDF/A, an image `format`, or a `url` render (each returns a 400).
 
 ## Polling
 

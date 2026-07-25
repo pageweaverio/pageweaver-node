@@ -419,8 +419,9 @@ export interface DocumentOutput {
    * mechanical (the role map, link descriptions, the document language, and marking running headers
    * and footers as artifacts) is handled for you.
    *
-   * Cannot be combined with a watermark, a PDF open-password, a digital signature, PDF/A, an image
-   * `format`, or a `url` render (each returns a 400).
+   * Works together with a digital signature: the conformance check runs on the SIGNED document, so
+   * the verdict covers the file you receive. Cannot be combined with a watermark, a PDF
+   * open-password, PDF/A, an image `format`, or a `url` render (each returns a 400).
    */
   pdfUa?: "1" | "none";
   /**
