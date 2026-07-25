@@ -585,8 +585,12 @@ export interface Document {
    */
   pdfa?: PdfaLevel | null;
   /**
-   * What had to change to honor the request. Today the only entry says the `Author` metadata field
-   * was dropped, which a PDF/A document cannot carry conformantly. Absent when nothing was adjusted.
+   * What had to change to honor the request. Two kinds of entry appear: the `Author` metadata field
+   * being dropped, which a PDF/A document cannot carry conformantly; and, for a structured e-invoice
+   * output (`facturx` / `ubl`), a template's frozen signing / open-password / PDF-A default that the
+   * chosen format cannot carry being skipped rather than applied (a facturx file is a PDF/A-3 that is
+   * not signed or encrypted; a ubl document is XML). Absent when nothing was adjusted. An *explicit*
+   * per-render request for an incompatible option is still a 400, not a notice.
    */
   outputNotices?: string[];
   download?: DownloadInfo;
