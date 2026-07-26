@@ -99,6 +99,11 @@ export interface LocalizationOptions {
   timeZone?: string;
   /** ISO 4217 currency, e.g. "EUR". */
   currency?: string;
+  /**
+   * Base text direction. `"auto"` (the default) follows the locale, so an Arabic or Hebrew locale
+   * produces a right-to-left document with nothing else set. Use `"ltr"`/`"rtl"` only to override.
+   */
+  direction?: "auto" | "ltr" | "rtl";
 }
 
 export interface PdfPermissions {

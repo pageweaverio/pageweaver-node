@@ -2835,7 +2835,7 @@
               "2b",
               "3b"
             ],
-            "description": "Archival PDF/A conformance. '2b' or '3b' produce a validated PDF/A; 'none' opts out of a template that defaults to archival output. Only b-level conformance is offered. Two consequences to know about: link annotations do not survive the conversion, and text set with OpenType feature substitution (for example `font-variant-numeric: tabular-nums`) stops being extractable, so a PDF/A document is not a searchability guarantee. The `Author` metadata field is dropped, because it cannot be written in a way the standard permits. Adds roughly 200ms plus 25ms per page. Cannot be combined with an image format, a PDF open-password, a digital signature, or a `url` render.",
+            "description": "Archival PDF/A conformance. '2b' or '3b' produce a validated PDF/A; 'none' opts out of a template that defaults to archival output. Only b-level conformance is offered. Two consequences to know about: link annotations do not survive the conversion, and text set with OpenType feature substitution (for example `font-variant-numeric: tabular-nums`) stops being extractable, so a PDF/A document is not a searchability guarantee. The `Author` metadata field is dropped, because it cannot be written in a way the standard permits. Adds roughly 200ms plus 25ms per page. Can be combined with a digital signature. Cannot be combined with an image format, a PDF open-password, or a `url` render.",
             "example": "3b"
           },
           "pdfUa": {
@@ -2844,7 +2844,7 @@
               "none",
               "1"
             ],
-            "description": "Accessible PDF/UA-1 output: a tagged document with a reading order, table headers, and described images, checked against the standard by the veraPDF reference validator before it is issued. '1' produces it; 'none' opts out of a template that defaults to it. Conformance depends on your markup, not only on this switch: every image needs alt text, headings must not skip levels, tables need header cells, and the document needs a language and a title. Cannot be combined with a watermark, a PDF open-password, a digital signature, PDF/A, an image format, or a `url` render.",
+            "description": "Accessible PDF/UA-1 output: a tagged document with a reading order, table headers, and described images, checked against the standard by the veraPDF reference validator before it is issued. '1' produces it; 'none' opts out of a template that defaults to it. Conformance depends on your markup, not only on this switch: every image needs alt text, headings must not skip levels, tables need header cells, and the document needs a language and a title. Can be combined with a digital signature: the conformance check runs on the signed document, so the verdict covers the file you receive. Cannot be combined with a watermark, a PDF open-password, PDF/A, an image format, or a `url` render.",
             "example": "1"
           },
           "conformance": {
@@ -3055,6 +3055,16 @@
             "type": "string",
             "example": "EUR",
             "description": "ISO 4217 default currency."
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ltr",
+              "rtl"
+            ],
+            "example": "auto",
+            "description": "Base text direction. `auto` (the default) follows the locale, so an Arabic or Hebrew locale produces a right-to-left document with nothing else set. Use `ltr`/`rtl` only to override that."
           }
         }
       },

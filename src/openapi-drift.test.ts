@@ -194,7 +194,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "rotation",
   ],
   OptionsStructureDto: ["outline", "taggedPdf"],
-  RenderLocalizationDto: ["locale", "timeZone", "currency"],
+  RenderLocalizationDto: ["locale", "timeZone", "currency", "direction"],
   OptionsSecurityDto: ["pdf", "signature", "download"],
   OptionsPdfSecurityDto: ["userPassword", "ownerPassword", "permissions"],
   OptionsPdfPermissionsDto: [
