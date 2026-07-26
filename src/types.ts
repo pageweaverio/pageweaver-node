@@ -404,8 +404,8 @@ export interface DocumentOutput {
    * - **The `Author` metadata field is dropped**, because PDF/A cannot record it conformantly. The
    *   API reports this in `outputNotices` on the document.
    *
-   * Adds roughly 200ms plus 25ms per page. Cannot be combined with an image `format`, a PDF
-   * open-password, a digital signature, or a `url` render (each returns a 400).
+   * Adds roughly 200ms plus 25ms per page. Works together with a digital signature. Cannot be
+   * combined with an image `format`, a PDF open-password, or a `url` render (each returns a 400).
    */
   pdfa?: PdfaLevel | "none";
   /**

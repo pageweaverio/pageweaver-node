@@ -109,7 +109,7 @@ Three things change, and two of them are invisible in the produced document:
 - **Some text stops being extractable.** Text set with OpenType feature substitution, most commonly `font-variant-numeric: tabular-nums`, looks identical but can no longer be selected, searched, or copied. Level b conformance does not require character mapping, so a PDF/A document is **not** a machine-readability guarantee.
 - **`Author` is not written**, because PDF/A cannot record it conformantly. Every other metadata field is written normally, and the drop is reported in `outputNotices`.
 
-It cannot be combined with an image `format`, a PDF open-password, a digital signature, or a `url` render (each returns a 400), and it adds roughly 200ms plus 25ms per page.
+A **digital signature** works alongside it: the signature is applied after the archival conversion and the result still validates. It cannot be combined with an image `format`, a PDF open-password, or a `url` render (each returns a 400), and it adds roughly 200ms plus 25ms per page.
 
 ### Accessible PDF/UA
 
