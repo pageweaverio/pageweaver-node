@@ -153,22 +153,6 @@ test("documents.create sends a ubl output with Peppol profile ids on the inline 
   assert.equal(body.output?.invoice?.profileId, "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0");
 });
 
-test("projects.list selects the configured project context", async () => {
-  const { fetch, calls } = mockFetch([json(200, [])]);
-  const pw = new PageWeaver({
-    apiKey: "pk_test_abc",
-    project: "european-invoicing",
-    baseUrl: "http://api.test",
-    fetch,
-  });
-
-  await pw.projects.list();
-  const call = calls[0];
-  assert.ok(call);
-  assert.equal(call.url, "http://api.test/v1/projects");
-  assert.equal(call.headers["x-pageweaver-project"], "european-invoicing");
-});
-
 test("documents.createSync defaults to JSON with the download url (no Accept: application/pdf)", async () => {
   const { fetch, calls } = mockFetch([
     json(200, {

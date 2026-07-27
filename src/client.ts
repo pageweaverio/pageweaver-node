@@ -11,13 +11,10 @@ import { DeploymentsResource } from "./deployments";
 import { LivingDocumentsResource } from "./livingDocuments";
 import { FormsResource } from "./forms";
 import { SubmissionsResource } from "./submissions";
-import { ProjectsResource } from "./projects";
 
 export interface PageWeaverOptions {
   /** Your secret API key: `pk_live_...` in production, `pk_test_...` in development. */
   apiKey: string;
-  /** Select an account-local project by id or slug for every request. Defaults to `default`. */
-  project?: string;
   /**
    * API base URL. Defaults to `https://api.pageweaver.io`. Point it at `http://localhost:4000`
    * when developing against a local stack.
@@ -59,8 +56,6 @@ export class PageWeaver {
   readonly forms: FormsResource;
   /** Form submissions: poll a submission's status + the document it produced. */
   readonly submissions: SubmissionsResource;
-  /** Account projects and the selected request context (Phase 2A). */
-  readonly projects: ProjectsResource;
 
   constructor(options: PageWeaverOptions) {
     const http = new HttpClient(options);
@@ -76,6 +71,5 @@ export class PageWeaver {
     this.livingDocuments = new LivingDocumentsResource(http);
     this.forms = new FormsResource(http);
     this.submissions = new SubmissionsResource(http);
-    this.projects = new ProjectsResource(http);
   }
 }

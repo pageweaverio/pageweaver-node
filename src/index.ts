@@ -22,7 +22,6 @@ export { DeploymentsResource } from "./deployments";
 export { LivingDocumentsResource } from "./livingDocuments";
 export { FormsResource } from "./forms";
 export { SubmissionsResource } from "./submissions";
-export { ProjectsResource } from "./projects";
 
 export {
   PageWeaverError,
@@ -52,7 +51,6 @@ export {
 } from "./webhooks";
 
 export type {
-  Project,
   DocumentStatus,
   DocumentOutput,
   PdfaLevel,

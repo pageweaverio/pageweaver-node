@@ -26,8 +26,6 @@ const spec = loadSpec();
 
 /** Every endpoint the SDK calls, as `METHOD path`. Kept exhaustive so a NEW public path fails the test. */
 const EXPECTED_ENDPOINTS: string[] = [
-  // Phase 2A project context. Send X-PageWeaver-Project with a project id or slug to select one.
-  "get /v1/projects",
   "post /v1/documents",
   "post /v1/documents/validate",
   "get /v1/documents",

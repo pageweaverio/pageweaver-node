@@ -2699,37 +2699,6 @@
           "forms"
         ]
       }
-    },
-    "/v1/projects": {
-      "get": {
-        "description": "Lists the active account's document initiatives. Send `X-PageWeaver-Project` with a project id or slug to select the request context; omitting it selects the account's `default` project.",
-        "operationId": "ProjectsController_list",
-        "parameters": [
-          {
-            "name": "X-PageWeaver-Project",
-            "in": "header",
-            "description": "Account-local project id or slug for the request context. Omit it to use the account's `default` project.",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "summary": "List projects",
-        "tags": [
-          "projects"
-        ]
-      }
     }
   },
   "info": {

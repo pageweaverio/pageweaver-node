@@ -8,8 +8,6 @@ export type FetchLike = (
 
 export interface HttpClientOptions {
   apiKey: string;
-  /** Account-local project id or slug sent as `X-PageWeaver-Project` on every API request. */
-  project?: string;
   /** API base URL. Defaults to https://api.pageweaver.io; point it at http://localhost:4000 in dev. */
   baseUrl?: string;
   /** Per-request timeout in milliseconds. Default 30000. */
@@ -37,7 +35,6 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  */
 export class HttpClient {
   private readonly apiKey: string;
-  private readonly project: string | undefined;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: FetchLike;
@@ -46,7 +43,6 @@ export class HttpClient {
     if (!opts.apiKey)
       throw new PageWeaverConnectionError("An `apiKey` is required.");
     this.apiKey = opts.apiKey;
-    this.project = opts.project?.trim() || undefined;
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const globalFetch = (globalThis as { fetch?: FetchLike }).fetch;
@@ -129,8 +125,6 @@ export class HttpClient {
       ...init.headers,
     };
     if (!init.noAuth) headers["x-api-key"] = this.apiKey;
-    if (!init.noAuth && this.project)
-      headers["x-pageweaver-project"] = this.project;
 
     let body: string | undefined;
     if (init.body !== undefined) {

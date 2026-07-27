@@ -10,18 +10,6 @@
 /** A terminal or in-flight document status. */
 export type DocumentStatus = "queued" | "rendering" | "done" | "failed";
 
-/** An account-owned document initiative (Phase 2A). Pass its id or slug as the SDK `project` option. */
-export interface Project {
-  id: string;
-  name: string;
-  slug: string;
-  status: "active" | "archived";
-  createdAt: string;
-  updatedAt: string;
-  /** True when it matches the project context selected for this request. */
-  active: boolean;
-}
-
 // ─── options.* (the single nested per-render override key) ──────────────────────
 
 export interface PageOptions {
