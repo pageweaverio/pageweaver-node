@@ -1108,6 +1108,11 @@ export interface UpdateCommentParams {
 export interface ReplyParams {
   body: string;
   mentions?: Mention[];
+  /**
+   * The message this reply answers, nesting it under that message. Omit for a reply at the top
+   * level of the thread. The message must belong to this thread.
+   */
+  parentMessageId?: string;
 }
 
 export interface CommentMessage {
@@ -1116,6 +1121,8 @@ export interface CommentMessage {
   mentions: unknown;
   authorUserId: string | null;
   externalAuthorName: string | null;
+  /** The message this answers. Null for a message at the top level of the thread. */
+  parentMessageId: string | null;
   /** ISO 8601 timestamp. */
   createdAt: string;
   editedAt: string | null;

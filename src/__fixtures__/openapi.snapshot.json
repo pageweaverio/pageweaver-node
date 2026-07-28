@@ -61,7 +61,7 @@
         ]
       },
       "get": {
-        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, batchId (scope to one bulk run's items, for per-item delivery reconciliation), createdAfter/createdBefore (ISO date-time, bounding creation time), and two independent delivery-channel filters. `delivery` reconciles the WEBHOOK channel, `storageDelivery` the direct-to-storage (BYOS) channel, and `emailDelivery` the email-to-recipient channel; each takes 'undelivered' (configured but never delivered successfully — the set to reconcile after an outage), 'failed', 'delivered', 'pending', 'skipped', or 'none'. Each item reports all three channels' latest outcome (`delivery` / `storageDelivery` / `emailDelivery`, with `deliveredAt` / `storageDeliveredAt` / `emailDeliveredAt`). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
+        "description": "Cursor-paginated history of documents this account generated, newest first. Filters: status, templateId, batchId (scope to one bulk run's items, for per-item delivery reconciliation), createdAfter/createdBefore (ISO date-time, bounding creation time), and two independent delivery-channel filters. `delivery` reconciles the WEBHOOK channel, `storageDelivery` the direct-to-storage (BYOS) channel, and `emailDelivery` the email-to-recipient channel; each takes 'undelivered' (configured but never delivered successfully: the set to reconcile after an outage), 'failed', 'delivered', 'pending', 'skipped', or 'none'. Each item reports all three channels' latest outcome (`delivery` / `storageDelivery` / `emailDelivery`, with `deliveredAt` / `storageDeliveredAt` / `emailDeliveredAt`). Pass include=url to attach a short-lived signed download URL to each finished document so you can list and fetch a missed window in one pass. Use the returned nextCursor to page.",
         "operationId": "RendersController_list",
         "parameters": [
           {
@@ -358,7 +358,7 @@
     },
     "/v1/documents/{id}/regenerate": {
       "post": {
-        "description": "Replay a prior document, counting as a new render (202 with a new document id). The optional `mode` chooses how: 'exact' (default) faithfully reproduces it (same pinned version, payload, options, output format, PDF/A level); 'current' re-runs the same inputs against the template's LATEST published version. Regenerate never overwrites your inputs — `mode` is the only accepted field, and a different version is only ever used when you explicitly ask for 'current'.",
+        "description": "Replay a prior document, counting as a new render (202 with a new document id). The optional `mode` chooses how: 'exact' (default) faithfully reproduces it (same pinned version, payload, options, output format, PDF/A level); 'current' re-runs the same inputs against the template's LATEST published version. Regenerate never overwrites your inputs. `mode` is the only accepted field, and a different version is only ever used when you explicitly ask for 'current'.",
         "operationId": "RendersController_regenerate",
         "parameters": [
           {
@@ -423,7 +423,7 @@
     },
     "/v1/usage": {
       "get": {
-        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page — a 10-page PDF counts as 10; failed renders aren't counted. Also returns the calling key's capability `scopes`, so a client (e.g. the CLI `login` command) can confirm the key and show what it may do.",
+        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page: a 10-page PDF counts as 10; failed renders aren't counted. Also returns the calling key's capability `scopes`, so a client (e.g. the CLI `login` command) can confirm the key and show what it may do.",
         "operationId": "UsageController_usage",
         "parameters": [],
         "responses": {
@@ -495,7 +495,7 @@
     },
     "/v1/templates/{id}/versions/{version}": {
       "get": {
-        "description": "One published version's metadata. Pass `?include=source` to also return the frozen editor source (compiled HTML + CSS, render settings, test data, pinned schema) — what `pageweaver pull` exports to round-trip a deployment. `read` scope; unknown version returns 404.",
+        "description": "One published version's metadata. Pass `?include=source` to also return the frozen editor source (compiled HTML + CSS, render settings, test data, pinned schema): what `pageweaver pull` exports to round-trip a deployment. `read` scope; unknown version returns 404.",
         "operationId": "TemplatesController_versionDetail",
         "parameters": [
           {
@@ -660,7 +660,7 @@
     },
     "/v1/schemas/{id}/versions/{version}": {
       "get": {
-        "description": "One published version's metadata. Pass `?include=nodes` to also return the frozen typed field tree (FieldNode[]) — what `pageweaver pull` exports so a re-deployed schema matches. `read` scope; unknown version returns 404.",
+        "description": "One published version's metadata. Pass `?include=nodes` to also return the frozen typed field tree (FieldNode[]): what `pageweaver pull` exports so a re-deployed schema matches. `read` scope; unknown version returns 404.",
         "operationId": "SchemasController_versionDetail",
         "parameters": [
           {
@@ -943,7 +943,7 @@
     },
     "/v1/comments/{id}/close": {
       "post": {
-        "description": "Close a thread (final — it can no longer change state).",
+        "description": "Close a thread (final: it can no longer change state).",
         "operationId": "CommentsController_close",
         "parameters": [
           {
@@ -1053,7 +1053,7 @@
     },
     "/v1/documents/{id}/pages": {
       "get": {
-        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist — the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
+        "description": "Per-page geometry (widthPts / heightPts) plus whether extracted text and a thumbnail exist: the denominators for normalized comment anchoring, so an integration can place comments without the viewer. Empty until post-render text extraction has run for the document.",
         "operationId": "DocumentCommentsController_listPages",
         "parameters": [
           {
@@ -2126,7 +2126,7 @@
     },
     "/v1/environments/{slug}/promote": {
       "post": {
-        "description": "Copy another environment's pin set onto this one (e.g. staging → production). Pass `templates` to partial-promote. Version history is never touched — only pointers move.",
+        "description": "Copy another environment's pin set onto this one (e.g. staging → production). Pass `templates` to partial-promote. Version history is never touched: only pointers move.",
         "operationId": "EnvironmentsController_promote",
         "parameters": [
           {
@@ -2594,7 +2594,7 @@
     },
     "/v1/forms/{id}/submissions": {
       "post": {
-        "description": "Submit a form's field values headlessly. The server evaluates the rules authoritatively (hidden fields are discarded, spoofed `_form` is ignored), validates against the pinned contract, and — when valid — renders the bound template into a document. Returns 202 with the submission id + status (`submitted` once queued, or `validation_failed`). Poll GET /v1/submissions/:id for the linked document. Requires the `render` scope; counts against your monthly submission limit.",
+        "description": "Submit a form's field values headlessly. The server evaluates the rules authoritatively (hidden fields are discarded, spoofed `_form` is ignored), validates against the pinned contract, and, when valid, renders the bound template into a document. Returns 202 with the submission id + status (`submitted` once queued, or `validation_failed`). Poll GET /v1/submissions/:id for the linked document. Requires the `render` scope; counts against your monthly submission limit.",
         "operationId": "FormsController_createSubmission",
         "parameters": [
           {
@@ -3227,7 +3227,7 @@
             }
           },
           "email": {
-            "description": "Email this document to end recipients. Replaces the template's email-delivery setting for this document (it is not merged into it, so a recipient list is never half-applied). Requires a plan with email delivery; recipients are subject to your workspace's allowed domains, the per-document recipient cap, and your monthly send budget.",
+            "description": "Email this document to end recipients. Replaces the template's email-delivery setting for this document (it is not merged into it, so a recipient list is never half-applied). Requires a plan with email delivery; recipients are subject to your account's allowed domains, the per-document recipient cap, and your monthly send budget.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/OptionsDeliveryEmailDto"
@@ -3484,7 +3484,7 @@
               "exact",
               "current"
             ],
-            "description": "Replay mode. 'exact' (default) faithfully reproduces the original document: the SAME pinned version, payload, options, output format, and PDF/A level. 'current' re-runs the same inputs against the template's LATEST published version, with that version's own frozen settings — for checking whether the input still works against your current template. 'current' needs a template-based document (an inline or url render has no version to advance)."
+            "description": "Replay mode. 'exact' (default) faithfully reproduces the original document: the SAME pinned version, payload, options, output format, and PDF/A level. 'current' re-runs the same inputs against the template's LATEST published version, with that version's own frozen settings, for checking whether the input still works against your current template. 'current' needs a template-based document (an inline or url render has no version to advance)."
           }
         }
       },
@@ -3531,25 +3531,25 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized x (0-1) — point/area/text."
+            "description": "Normalized x (0-1): point, area or text."
           },
           "y": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized y (0-1) — point/area/text."
+            "description": "Normalized y (0-1): point, area or text."
           },
           "width": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized width (0-1) — area/text."
+            "description": "Normalized width (0-1): area or text."
           },
           "height": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Normalized height (0-1) — area/text."
+            "description": "Normalized height (0-1): area or text."
           },
           "selectedText": {
             "type": "string",
@@ -3678,6 +3678,11 @@
             "items": {
               "$ref": "#/components/schemas/MentionDto"
             }
+          },
+          "parentMessageId": {
+            "type": "string",
+            "description": "The message this reply answers, nesting it under that message. Omit for a reply at the top level of the thread. The message must belong to this thread.",
+            "example": "cmsg_7cc708d4068944bca46faf7c60fc0bf2"
           }
         },
         "required": [

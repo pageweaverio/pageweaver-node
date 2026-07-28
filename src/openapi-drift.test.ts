@@ -245,7 +245,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "width",
     "height",
   ],
-  ReplyDto: ["body", "mentions"],
+  ReplyDto: ["body", "mentions", "parentMessageId"],
   MigrateCommentsDto: ["fromDocumentId"],
   ReviewPolicyDto: [
     "requireAllCommentsResolved",
