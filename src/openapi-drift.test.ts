@@ -312,6 +312,7 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "commitSha",
     "sourceRef",
     "source",
+    "gitRepo",
     "env",
   ],
   // Smart Forms request DTOs (Phase D, V2-D06). Both carry just the field `data`.

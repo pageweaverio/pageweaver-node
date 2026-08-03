@@ -1728,6 +1728,12 @@ export interface PlanDeploymentParams {
   sourceRef?: string;
   /** Where the plan originated (provenance only). Defaults to "cli". */
   source?: DeploymentSource;
+  /**
+   * The repository the manifest came from, as `owner/name` (provenance only). The CLI fills this
+   * from `GITHUB_REPOSITORY` or its `--git-repo` flag, so the portal links a deployment's commit to
+   * the repo that produced it instead of guessing from the account's Git connections.
+   */
+  gitRepo?: string;
   /** Values for resolving `${NAME}` references in the manifest (e.g. a webhook URL secret). */
   env?: Record<string, string>;
 }

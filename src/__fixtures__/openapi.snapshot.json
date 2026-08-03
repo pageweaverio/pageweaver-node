@@ -66,15 +66,21 @@
         "parameters": [
           {
             "name": "status",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
+              "enum": [
+                "queued",
+                "running",
+                "done",
+                "failed"
+              ],
               "type": "string"
             }
           },
           {
             "name": "templateId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -82,15 +88,16 @@
           },
           {
             "name": "batchId",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Scope to one bulk run's items, for per-item delivery reconciliation.",
             "schema": {
               "type": "string"
             }
           },
           {
             "name": "cursor",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -98,7 +105,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -106,48 +113,78 @@
           },
           {
             "name": "createdAfter",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "ISO date-time lower bound.",
             "schema": {
               "type": "string"
             }
           },
           {
             "name": "createdBefore",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "ISO date-time upper bound.",
             "schema": {
               "type": "string"
             }
           },
           {
             "name": "delivery",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Webhook-channel delivery outcome.",
             "schema": {
+              "enum": [
+                "undelivered",
+                "failed",
+                "delivered",
+                "pending",
+                "skipped",
+                "none"
+              ],
               "type": "string"
             }
           },
           {
             "name": "storageDelivery",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Direct-to-storage (BYOS) delivery outcome.",
             "schema": {
+              "enum": [
+                "undelivered",
+                "failed",
+                "delivered",
+                "pending",
+                "skipped",
+                "none"
+              ],
               "type": "string"
             }
           },
           {
             "name": "emailDelivery",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Email-to-recipient delivery outcome.",
             "schema": {
+              "enum": [
+                "undelivered",
+                "failed",
+                "delivered",
+                "pending",
+                "skipped",
+                "none"
+              ],
               "type": "string"
             }
           },
           {
             "name": "include",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Pass `url` to attach a short-lived signed download URL to each finished document.",
             "schema": {
               "type": "string"
             }
@@ -516,8 +553,9 @@
           },
           {
             "name": "include",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Pass `source` to include the frozen compiled artifact.",
             "schema": {
               "type": "string"
             }
@@ -681,8 +719,9 @@
           },
           {
             "name": "include",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Pass `nodes` to include the typed field tree alongside the compiled JSON Schema.",
             "schema": {
               "type": "string"
             }
@@ -719,8 +758,9 @@
           },
           {
             "name": "version",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Pin a published version. Defaults to the latest published one.",
             "schema": {
               "type": "string"
             }
@@ -1187,7 +1227,7 @@
         "parameters": [
           {
             "name": "status",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1195,7 +1235,7 @@
           },
           {
             "name": "documentId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1203,7 +1243,7 @@
           },
           {
             "name": "cursor",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1211,7 +1251,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1440,7 +1480,7 @@
         "parameters": [
           {
             "name": "documentId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1448,7 +1488,7 @@
           },
           {
             "name": "reviewRequestId",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1456,7 +1496,7 @@
           },
           {
             "name": "cursor",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1464,7 +1504,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1570,7 +1610,7 @@
           },
           {
             "name": "status",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1578,7 +1618,7 @@
           },
           {
             "name": "cursor",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -1586,7 +1626,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -2362,7 +2402,7 @@
         "parameters": [
           {
             "name": "cursor",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -2370,7 +2410,7 @@
           },
           {
             "name": "limit",
-            "required": true,
+            "required": false,
             "in": "query",
             "schema": {
               "type": "string"
@@ -2647,8 +2687,9 @@
           },
           {
             "name": "include",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Pass `source` to include the full definition (schema and template refs, layout, rules, tests).",
             "schema": {
               "type": "string"
             }
@@ -4120,6 +4161,11 @@
             "type": "string",
             "description": "Branch/tag/workflow-run ref for provenance, e.g. 'refs/heads/main' or a PR number.",
             "example": "refs/heads/main"
+          },
+          "gitRepo": {
+            "type": "string",
+            "description": "The repository the manifest was deployed from, as 'owner/name'. Recorded for provenance and used to build the commit link in the portal. The CLI fills this in from the git remote.",
+            "example": "acme/documents"
           },
           "source": {
             "type": "string",
