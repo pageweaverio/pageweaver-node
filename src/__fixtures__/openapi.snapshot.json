@@ -433,6 +433,154 @@
         ]
       }
     },
+    "/v1/documents/{id}/versions": {
+      "get": {
+        "description": "Return the document's own version sequence, newest first: a 1-based gap-free `seq`, the `documentId` to download each version by, its content fingerprint and hash-chain position, and the `supersededBySeq` link forward to whatever replaced it. A document that has only ever been issued once has exactly one version. Any version's id resolves the same sequence, so you can ask this of the id you happen to hold.",
+        "operationId": "RendersController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a document's versions",
+        "tags": [
+          "documents"
+        ]
+      },
+      "post": {
+        "description": "Append a version to a document: the same pinned template and schema version, new data. Returns 202 with the new version's own document id, which you poll exactly like any other document. The prior version stays retrievable and is marked superseded, and a `document.superseded` webhook fires. If the document has a public alias, the alias now resolves to this version.\n\nOnly a document rendered from a template version can be reissued; use POST /v1/documents/:id/regenerate to replay an inline or url-to-pdf document.",
+        "operationId": "RendersController_appendVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppendDocumentVersionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The new version is queued."
+          },
+          "402": {
+            "description": "The account's plan does not allow another document with a version history."
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Issue a new version of a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/{id}/versions/{seq}": {
+      "get": {
+        "description": "Return one pinned version of a document's sequence. The version is immutable: a correction is always a new, superseding version, never an edit to this one.",
+        "operationId": "RendersController_versionDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "seq",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get one version of a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/{id}/representations": {
+      "get": {
+        "description": "Return every artifact a version of this document produced: the PDF, its XML sidecar, its JSON data twin. Each entry carries format, standards profile, role (`primary` is what the document envelope's `outputFormat`, `pages` and `contentHash` describe), status, size, fingerprint and conformance verdicts. With no `version` this describes the version the id you asked with names.",
+        "operationId": "RendersController_representations",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": false,
+            "in": "query",
+            "description": "Which version of the document to describe. Defaults to the one this id names.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List a document version's representations",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/v1/documents/{id}/content": {
       "get": {
         "description": "Stream a download-protected document's PDF. Supply the download password via the `X-Document-Password` header or HTTP Basic auth (any username). No API key is used. Returns 401 if the password is missing/wrong, 404 if the document isn't protected or isn't ready, 429 if too many attempts. All responses are `Cache-Control: private, no-store`.",
@@ -460,7 +608,7 @@
     },
     "/v1/usage": {
       "get": {
-        "description": "Current calendar-month page usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`) and editor PDF-preview pages (`previewPages`/`previewLimit`). Metered by page: a 10-page PDF counts as 10; failed renders aren't counted. Also returns the calling key's capability `scopes`, so a client (e.g. the CLI `login` command) can confirm the key and show what it may do.",
+        "description": "Current billing-period usage against plan quotas (feeds metered billing): billable API document pages (`pages`/`limit`), editor PDF-preview pages (`previewPages`/`previewLimit`), and non-paginated representations (`representations`/`representationLimit`). Documents are metered by page: a 10-page PDF counts as 10; failed renders aren't counted. An output with no page model, such as a standalone XML invoice, counts as one representation instead of a page, so attaching one to a document does not double its cost. Also returns the calling key's capability `scopes`, so a client (e.g. the CLI `login` command) can confirm the key and show what it may do.",
         "operationId": "UsageController_usage",
         "parameters": [],
         "responses": {
@@ -476,6 +624,230 @@
         "summary": "Account usage",
         "tags": [
           "usage"
+        ]
+      }
+    },
+    "/v1/documents/intake": {
+      "post": {
+        "description": "Scans the file, then creates a document with the SAME retention, search, evidence, and proof-pack capabilities a generated document has. Synchronous: the response is the finished document. Single file, PDF only, no resumable/chunked sessions.\n\nRequires the `documents:upload` scope.",
+        "operationId": "IntakeController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "objectId": {
+                    "type": "string",
+                    "description": "Optional — link to an existing object."
+                  },
+                  "objectRole": {
+                    "type": "string",
+                    "enum": [
+                      "primary",
+                      "supporting",
+                      "evidence",
+                      "generated_for",
+                      "correspondence"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The uploaded document, already in its finished state."
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upload a document",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/intake/sessions": {
+      "post": {
+        "description": "Declares the file's total size and chunk size up front. Returns the session id and how many chunks to send. Requires the `documents:upload` scope.",
+        "operationId": "IntakeSessionController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUploadSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Start a resumable upload session",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/intake/sessions/{id}": {
+      "get": {
+        "description": "Which chunks have landed, so a resumed client knows what is still missing.",
+        "operationId": "IntakeSessionController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get an upload session's status",
+        "tags": [
+          "documents"
+        ]
+      },
+      "delete": {
+        "description": "Deletes the staged chunks. A finished (done) session cannot be abandoned.",
+        "operationId": "IntakeSessionController_abandon",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Abandon an upload session",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/intake/sessions/{id}/chunks/{index}": {
+      "put": {
+        "description": "0-based index. Idempotent: re-sending an already-received index is a no-op success, so a client that lost the response to a previous attempt can just retry it.",
+        "operationId": "IntakeSessionController_putChunk",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "index",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chunk": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Upload one chunk",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
+    "/v1/documents/intake/sessions/{id}/finalize": {
+      "post": {
+        "description": "Every chunk must have arrived first. Assembles them and runs the SAME pipeline `POST /v1/documents/intake` runs synchronously (malware scan, PDF check, duplicate check, document creation) over the assembled bytes. Response is the finished document.",
+        "operationId": "IntakeSessionController_finalize",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The uploaded document, already in its finished state."
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Finalize an upload session",
+        "tags": [
+          "documents"
         ]
       }
     },
@@ -2366,181 +2738,6 @@
         ]
       }
     },
-    "/v1/living-documents": {
-      "post": {
-        "description": "Create a stable document identity from a template and issue its first version. Freezes the pinned template version + schema; reissuing later changes the data, never the design. Optionally publishes a public /d/:alias link. Returns the living-document id and the first version's queued document id (poll GET /v1/documents/:id).",
-        "operationId": "LivingDocumentsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateLivingDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "summary": "Create a living document",
-        "tags": [
-          "living-documents"
-        ]
-      },
-      "get": {
-        "description": "Cursor-paginated list of this account's living documents, newest first.",
-        "operationId": "LivingDocumentsController_list",
-        "parameters": [
-          {
-            "name": "cursor",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "summary": "List living documents",
-        "tags": [
-          "living-documents"
-        ]
-      }
-    },
-    "/v1/living-documents/{id}/versions": {
-      "post": {
-        "description": "Issue a new version under the same identity: the new payload is validated against the pinned schema and rendered; it supersedes the prior head and fires document.superseded. An invalid payload is rejected (400) and creates no new version.",
-        "operationId": "LivingDocumentsController_reissue",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ReissueLivingDocumentDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "summary": "Reissue a living document",
-        "tags": [
-          "living-documents"
-        ]
-      }
-    },
-    "/v1/living-documents/{id}/versions/{seq}": {
-      "get": {
-        "description": "One pinned version's metadata + integrity (the underlying document id, content hash, chain position).",
-        "operationId": "LivingDocumentsController_versionDetail",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "seq",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "summary": "Get a living-document version",
-        "tags": [
-          "living-documents"
-        ]
-      }
-    },
-    "/v1/living-documents/{id}": {
-      "get": {
-        "description": "The identity, its current head version, and the full ordered version history with per-version integrity.",
-        "operationId": "LivingDocumentsController_get",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apiKey": []
-          }
-        ],
-        "summary": "Get a living document",
-        "tags": [
-          "living-documents"
-        ]
-      }
-    },
     "/v1/forms": {
       "get": {
         "description": "All published forms owned by the key's account (id, name, slug, current version, and the pinned template + schema versions), newest-updated first. Draft-only forms are omitted. Authoring happens in the portal, not via the API.",
@@ -2713,7 +2910,7 @@
     },
     "/v1/submissions/{id}": {
       "get": {
-        "description": "A submission's status (`submitted` / `validation_failed` / `rendered` / `delivered` / …), its data fingerprint, the linked document id (`renderJobId`) once accepted for render, and the validation messages when it failed. The account must own it; unknown id returns 404.",
+        "description": "A submission's status (`submitted` / `validation_failed` / `rendered` / `delivered` / …), its data fingerprint, the linked document id (`documentId`) once accepted for render, and the validation messages when it failed. The account must own it; unknown id returns 404.",
         "operationId": "SubmissionsController_get",
         "parameters": [
           {
@@ -2738,6 +2935,1267 @@
         "summary": "Get a submission",
         "tags": [
           "forms"
+        ]
+      }
+    },
+    "/v1/object-types": {
+      "get": {
+        "description": "Every object type in the account, newest first. Cursor-paginated: pass the returned `nextCursor` back as `cursor`.",
+        "operationId": "ObjectTypesController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by lifecycle: `draft`, `published`, or `deprecated`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from `nextCursor`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size, 1 to 100. Default 25.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List object types",
+        "tags": [
+          "object-types"
+        ]
+      },
+      "post": {
+        "description": "Creates a DRAFT. Nothing may be written against it until it is published: a record validated against an artifact that was never frozen has no contract to be read back against. The schema is checked at creation as well as at publish, so a mistake surfaces next to the field that caused it rather than at the finish line.",
+        "operationId": "ObjectTypesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateObjectTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create an object type",
+        "tags": [
+          "object-types"
+        ]
+      }
+    },
+    "/v1/object-types/{id}": {
+      "get": {
+        "description": "The type plus its current DRAFT artifact. `hasUnpublishedChanges` is true when the draft has moved on from the published version. For the frozen contract a record was validated against, read the version instead.",
+        "operationId": "ObjectTypesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get an object type",
+        "tags": [
+          "object-types"
+        ]
+      },
+      "patch": {
+        "description": "Replaces the parts you send and leaves the rest alone. Editing the artifact clears the published marker, so the type reports unpublished changes until you publish again. Published versions are never touched.",
+        "operationId": "ObjectTypesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateObjectTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update an object type draft",
+        "tags": [
+          "object-types"
+        ]
+      }
+    },
+    "/v1/object-types/{id}/versions": {
+      "get": {
+        "description": "Published version history, newest first. `isCurrent` marks the version new records are validated against. Cursor-paginated.",
+        "operationId": "ObjectTypesController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List object type versions",
+        "tags": [
+          "object-types"
+        ]
+      }
+    },
+    "/v1/object-types/{id}/versions/{version}": {
+      "get": {
+        "description": "One frozen contract: the JSON Schema exactly as published, plus the COMPILED field policies every consumer reads. The policies are derived at publish from the schema's annotations and the overlay, so encryption, list columns, and search can never disagree about which fields are protected.",
+        "operationId": "ObjectTypesController_versionDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get an object type version",
+        "tags": [
+          "object-types"
+        ]
+      }
+    },
+    "/v1/object-types/{id}/publish": {
+      "post": {
+        "description": "Freezes the draft as the next immutable version and advances the pointer, atomically. Republishing an unchanged draft returns the current version with `unchanged: true` rather than minting a duplicate. Returns the compiled field policies so a client can see exactly what was frozen.",
+        "operationId": "ObjectTypesController_publish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishObjectTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Publish an object type",
+        "tags": [
+          "object-types"
+        ]
+      }
+    },
+    "/v1/object-types/{id}/deprecate": {
+      "post": {
+        "description": "Stops NEW records being created against the type; existing records keep working and stay readable. There is no delete: a type is the contract every record of that kind was validated against, so removing it would orphan history the platform exists to explain.",
+        "operationId": "ObjectTypesController_deprecate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateObjectTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Deprecate an object type",
+        "tags": [
+          "object-types"
+        ]
+      }
+    },
+    "/v1/objects": {
+      "get": {
+        "description": "Records in the account, newest first, cursor-paginated. A list row carries the projected title, state, classification and version, but never field VALUES: reading values is a per-record operation so that access to them can be reasoned about one record at a time.",
+        "operationId": "ObjectsController_list",
+        "parameters": [
+          {
+            "name": "objectTypeKey",
+            "required": false,
+            "in": "query",
+            "description": "Narrow to one type by key.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "objectTypeId",
+            "required": false,
+            "in": "query",
+            "description": "Narrow to one type by id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "`active` or `archived`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lifecycleState",
+            "required": false,
+            "in": "query",
+            "description": "Your own state value.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "number",
+            "required": false,
+            "in": "query",
+            "description": "Exact object number, the identifier quoted from a printed document.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from `nextCursor`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size, 1 to 100. Default 25.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List objects",
+        "tags": [
+          "objects"
+        ]
+      },
+      "post": {
+        "description": "Validates the complete value against the type's current published version, hashes it, then splits the sensitive fields into an encrypted envelope before anything is stored. Validating or hashing only the public half would let a required protected field go missing unnoticed, and would give a fingerprint that does not move when a tax number does.",
+        "operationId": "ObjectsController_create",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Tenant-local key making a retried create safe. Without one, a retry mints a SECOND record with a second object number, and a printed document may already carry the first. An exact repeat returns the original record; the same key with a different request returns 409.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateObjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create an object",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}": {
+      "get": {
+        "description": "The record and its value, with every field this caller may not read removed. Withheld fields are ABSENT rather than masked: a placeholder string is something a template or an export would render as though it were the value. `withheldPaths` lists what this caller may not see on this TYPE, which is the same for every record of it, so the list never reveals whether a particular record has a value there. If an envelope exists but cannot be opened, the response says so explicitly instead of reporting the record as having no protected data.",
+        "operationId": "ObjectsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "required": false,
+            "in": "query",
+            "description": "Read a specific version instead of the current one.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeSensitive",
+            "required": false,
+            "in": "query",
+            "description": "Set `true` to decrypt and include the fields the type marks sensitive. Requires the `objects:read-sensitive` scope, and is refused with 403 rather than quietly redacted: a caller told `true` succeeded would read the missing field as empty and act on it. Omit it to read the record without those fields, which is never refused.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get an object",
+        "tags": [
+          "objects"
+        ]
+      },
+      "put": {
+        "description": "Writes a new immutable version. The WHOLE value is replaced, never merged: a partial update would have to decide what an absent key means, and neither answer is right for a record a document was issued from. Validation is against the type's CURRENT published version, so a record can move onto a newer contract; the version it was actually checked against is recorded on the new row either way.",
+        "operationId": "ObjectsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "if-match",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "The version you believe you are editing, as an alternative to the `expectedVersion` field. The field wins if both are sent.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateObjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update an object",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/versions": {
+      "get": {
+        "description": "What changed, when, by whom, and why — never the values. `dataHash` covers the complete value including the protected half, so an unchanged hash means the record genuinely did not move. Read a version's value with `GET /v1/objects/{id}?version=N`.",
+        "operationId": "ObjectsController_versions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List object versions",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/archive": {
+      "post": {
+        "description": "Puts the record away without destroying it. There is no delete: an object is what documents, links and events point at, and removing one would orphan every reference. Archiving is reversible and leaves the whole version history readable.",
+        "operationId": "ObjectsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveObjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Archive an object",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/restore": {
+      "post": {
+        "description": "Brings an archived record back. No new version: restoring changes status, not value.",
+        "operationId": "ObjectsController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Restore an object",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/relationships": {
+      "get": {
+        "description": "Every edge touching this record, in BOTH directions, each marked `outgoing` or `incoming` with the record at the far end. Live edges only unless `includeEnded=true`.",
+        "operationId": "ObjectsController_relationships",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeEnded",
+            "required": false,
+            "in": "query",
+            "description": "Include relationships whose validity has closed.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List an object's relationships",
+        "tags": [
+          "objects"
+        ]
+      },
+      "post": {
+        "description": "Draws an edge from this record to another. Idempotent: an identical live edge is returned unchanged rather than duplicated. Refused when the endpoint types are outside the relationship type's allow-list, when the cardinality is already satisfied, when either record is archived, or when the two belong to different accounts.",
+        "operationId": "ObjectsController_relate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRelationshipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Relate an object to another",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/relationships/{relationshipId}/end": {
+      "post": {
+        "description": "Closes the edge's validity and keeps the row. Nothing is deleted: a document issued last March may have been composed on the strength of a link that no longer holds, and a records platform that erases the link cannot explain the document. The same two records may be related again afterwards.",
+        "operationId": "ObjectsController_endRelationship",
+        "parameters": [
+          {
+            "name": "relationshipId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndRelationshipDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "End a relationship",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/documents": {
+      "get": {
+        "description": "Every document filed against this record, with the role it was filed under. This is the read that answers `everything ever issued about this supplier` without the supplier having been copied into any of them.",
+        "operationId": "ObjectsController_documents",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List an object's documents",
+        "tags": [
+          "objects"
+        ]
+      },
+      "post": {
+        "description": "Idempotent per (document, object, role). The same document may be the `primary` document of a contract and `evidence` for a claim; those are two different facts. An archived record may still be filed against, because a final invoice or a termination letter arrives after the record closes.",
+        "operationId": "ObjectsController_linkDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkDocumentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "File a document against an object",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/objects/{id}/documents/{documentId}": {
+      "delete": {
+        "description": "Removes the link. Unlike a relationship, this really is removed: a link is a statement about filing, which is either right or wrong, never right for a period. Idempotent — removing a link that is not there succeeds with `removed: false`.",
+        "operationId": "ObjectsController_unlinkDocument",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "documentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "required": false,
+            "in": "query",
+            "description": "Which role to unfile. Defaults to `primary`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Unfile a document from an object",
+        "tags": [
+          "objects"
+        ]
+      }
+    },
+    "/v1/relationship-types": {
+      "get": {
+        "description": "Every edge definition in the account, newest first. Cursor-paginated.",
+        "operationId": "RelationshipTypesController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "`active` or `deprecated`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List relationship types",
+        "tags": [
+          "relationship-types"
+        ]
+      },
+      "post": {
+        "description": "Defines an edge. Endpoint allow-lists name object types by key and are verified to exist, so a typo is refused here rather than silently refusing every edge later.",
+        "operationId": "RelationshipTypesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRelationshipTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Create a relationship type",
+        "tags": [
+          "relationship-types"
+        ]
+      }
+    },
+    "/v1/relationship-types/{id}": {
+      "get": {
+        "operationId": "RelationshipTypesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Get a relationship type",
+        "tags": [
+          "relationship-types"
+        ]
+      },
+      "patch": {
+        "description": "Changes govern the NEXT edge drawn. Existing edges are never re-checked or removed: a settings change must not silently erase records a document was issued from.",
+        "operationId": "RelationshipTypesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRelationshipTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Update a relationship type",
+        "tags": [
+          "relationship-types"
+        ]
+      }
+    },
+    "/v1/relationship-types/{id}/deprecate": {
+      "post": {
+        "description": "Stops new edges of this kind; existing ones keep working. There is no delete, because several documents' composition may rest on those edges.",
+        "operationId": "RelationshipTypesController_deprecate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeprecateRelationshipTypeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Deprecate a relationship type",
+        "tags": [
+          "relationship-types"
+        ]
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "description": "The account's events in sequence order, oldest first. Pass the `seq` you last processed as `after` to resume. `latestSeq` is the account's newest position: when it equals your cursor you are caught up, which is a stronger statement than an empty page.",
+        "operationId": "EventsController_list",
+        "parameters": [
+          {
+            "name": "after",
+            "required": false,
+            "in": "query",
+            "description": "Resume after this `seq` (exclusive). Omit to start at the beginning.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size, 1 to 200. Default 50.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Exact event type, e.g. `document.completed`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectType",
+            "required": false,
+            "in": "query",
+            "description": "What the event is about, e.g. `document` or `object`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectId",
+            "required": false,
+            "in": "query",
+            "description": "History of one thing.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "correlationId",
+            "required": false,
+            "in": "query",
+            "description": "Everything one request caused. The same value is returned in the `X-Correlation-Id` response header.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "List events",
+        "tags": [
+          "events"
+        ]
+      }
+    },
+    "/v1/search": {
+      "get": {
+        "description": "Full-text search (websearch syntax: quote a phrase, - to exclude, OR between terms) over your account's objects and documents, permission-trimmed. A snippet highlights the match; it is built only from non-sensitive fields or extracted document text, so a hit can never surface a sensitive field's value regardless of what matched.",
+        "operationId": "SearchController_search",
+        "parameters": [
+          {
+            "name": "subjectType",
+            "required": false,
+            "in": "query",
+            "description": "Narrow to one kind: `object` or `document`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "objectTypeKey",
+            "required": false,
+            "in": "query",
+            "description": "Narrow object hits to one type.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "classification",
+            "required": false,
+            "in": "query",
+            "description": "Exact classification: `public`, `internal`, `confidential`, or `restricted`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerUserId",
+            "required": false,
+            "in": "query",
+            "description": "Narrow to one owner.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "updatedAfter",
+            "required": false,
+            "in": "query",
+            "description": "ISO timestamp; only hits whose source record changed at or after this.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "updatedBefore",
+            "required": false,
+            "in": "query",
+            "description": "ISO timestamp; only hits whose source record changed at or before this.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Opaque cursor from `nextCursor`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size, 1 to 100. Default 25.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "The search query. Required, non-empty.",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
+        "summary": "Search objects and documents",
+        "tags": [
+          "search"
         ]
       }
     }
@@ -2776,6 +4234,22 @@
     {
       "name": "share-links",
       "description": "Create capability-scoped links so people without an account can view, comment on, or approve a document. Requires an API key with the review scope."
+    },
+    {
+      "name": "object-types",
+      "description": "Define the shapes your business records take: Contract, Supplier, Claim. A type's published versions are immutable, so a record written against version 3 stays readable against version 3 whatever the draft becomes. Requires the objects:read and object-types:manage scopes."
+    },
+    {
+      "name": "objects",
+      "description": "The records your documents are about. An object is not a file: it is a typed, versioned record whose every value is kept, so what it said on the day a document was issued still has an answer. Documents and other records point at an object rather than copying it. Requires the objects:read and objects:write scopes."
+    },
+    {
+      "name": "relationship-types",
+      "description": "The kinds of edge your records may have between them, and how many of each end may carry. Requires the objects:read and relationships:manage scopes."
+    },
+    {
+      "name": "search",
+      "description": "Full-text search across your objects and documents, permission-trimmed. Requires the search:read scope; object hits are additionally gated by objects:read."
     }
   ],
   "servers": [],
@@ -2797,16 +4271,25 @@
               "pdf",
               "facturx",
               "ubl",
+              "cii",
+              "json",
               "png",
               "jpeg",
               "webp"
             ],
-            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document. 'facturx' returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded, so one file is both the human PDF and the machine-readable invoice. 'ubl' returns a standalone EN 16931 UBL 2.1 invoice as pure XML (no PDF), for buyers who ingest the structured invoice directly. Both facturx and ubl need a template or inline render (not a url) and take the invoice from the template version's e-invoice binding or an explicit `invoice`; facturx is always PDF/A-3b and cannot be signed or encrypted, and ubl produces no PDF so it cannot carry PDF/A, a signature, or a PDF open-password."
+            "description": "Output format. Default 'pdf'. png/jpeg/webp render a single image of the document. 'facturx' returns a Factur-X / ZUGFeRD file: a PDF/A-3 with the EN 16931 e-invoice (CII) embedded, so one file is both the human PDF and the machine-readable invoice. 'ubl' and 'cii' return a standalone EN 16931 invoice as pure XML (no PDF), for buyers who ingest the structured invoice directly: 'ubl' is UBL 2.1 syntax and 'cii' is the CII syntax that facturx embeds. The three structured formats need a template or inline render (not a url) and take the invoice from the template version's e-invoice binding or an explicit `invoice`; facturx is always PDF/A-3b and cannot be signed or encrypted, and ubl/cii produce no PDF so they cannot carry PDF/A, a signature, or a PDF open-password. 'json' returns a DATA TWIN: the approved projection of the data the document was produced from, so a recipient's system can read what the PDF says without parsing the PDF. Fields the schema marks sensitive are omitted unless `output.profile` is \"protected\"."
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "protected"
+            ],
+            "description": "Content profile for the chosen format. Today only `json` takes one: \"protected\" includes the fields the schema marks sensitive, which are otherwise omitted from a data twin. Requires the plan capability that gates the format itself."
           },
           "invoice": {
             "type": "object",
             "additionalProperties": true,
-            "description": "Structured e-invoice data for a `facturx` or `ubl` render, as a canonical EN 16931 invoice object (invoiceNumber, issueDate, currency, seller, buyer, lines[], ...). Use this for inline / one-off renders that have no template binding, or to override the version's binding. Validated against EN 16931; a plausible-but-invalid invoice is rejected. Set `customizationId` / `profileId` on the object to tag a `ubl` document as Peppol BIS Billing 3.0."
+            "description": "Structured e-invoice data for a `facturx`, `ubl` or `cii` render, as a canonical EN 16931 invoice object (invoiceNumber, issueDate, currency, seller, buyer, lines[], ...). Use this for inline / one-off renders that have no template binding, or to override the version's binding. Validated against EN 16931; a plausible-but-invalid invoice is rejected. Set `customizationId` / `profileId` on the object to tag a `ubl` document as Peppol BIS Billing 3.0."
           },
           "width": {
             "type": "number",
@@ -3432,6 +4915,16 @@
             "description": "HTTPS URL to receive a signed POST when this render reaches a terminal state (done/failed). Overrides the account-default webhook for this render only. Polling still works regardless.",
             "example": "https://example.com/pageweaver/webhook"
           },
+          "publicAlias": {
+            "type": "boolean",
+            "description": "Mint a permanent public link for this document at `/d/{alias}`. The link always resolves to the document's newest version; append `@n` to pin one. Anyone holding the link can read the document, so the token is the access control: it is returned once, on this response, and is never listed again. Reissue under the same link with `POST /v1/documents/{id}/versions`.",
+            "example": true
+          },
+          "name": {
+            "type": "string",
+            "description": "A human name for the document, shown wherever it is listed. Useful when the document will gain further versions, so the series is recognizable rather than an id.",
+            "example": "Q3 statement of account"
+          },
           "options": {
             "description": "Per-render document properties, layered on the version's frozen settings for this render only. Nest every override under this one key (page / rendering / metadata / header / footer / watermark / structure / localization / security). Unknown keys are rejected (400).",
             "example": {
@@ -3528,6 +5021,59 @@
             "description": "Replay mode. 'exact' (default) faithfully reproduces the original document: the SAME pinned version, payload, options, output format, and PDF/A level. 'current' re-runs the same inputs against the template's LATEST published version, with that version's own frozen settings, for checking whether the input still works against your current template. 'current' needs a template-based document (an inline or url render has no version to advance)."
           }
         }
+      },
+      "AppendDocumentVersionDto": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "type": "object",
+            "description": "The data for this version, validated against the document's pinned schema version."
+          }
+        },
+        "required": [
+          "payload"
+        ]
+      },
+      "CreateUploadSessionDto": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "The file's name (display/download only, not a storage path)."
+          },
+          "mediaType": {
+            "type": "string",
+            "description": "Declared media type. Only application/pdf is accepted at finalize."
+          },
+          "totalBytes": {
+            "type": "number",
+            "description": "Total size of the file, in bytes."
+          },
+          "chunkSize": {
+            "type": "number",
+            "description": "Size of each chunk, in bytes, except possibly the last. Max 10 MiB."
+          },
+          "objectId": {
+            "type": "string",
+            "description": "Link the finalized document to an existing object (ODP-007's DocumentObjectLink), in the given role."
+          },
+          "objectRole": {
+            "type": "string",
+            "description": "The link's role. Defaults to 'evidence'.",
+            "enum": [
+              "primary",
+              "supporting",
+              "evidence",
+              "generated_for",
+              "correspondence"
+            ]
+          }
+        },
+        "required": [
+          "filename",
+          "totalBytes",
+          "chunkSize"
+        ]
       },
       "MentionDto": {
         "type": "object",
@@ -4190,49 +5736,6 @@
           "files"
         ]
       },
-      "CreateLivingDocumentDto": {
-        "type": "object",
-        "properties": {
-          "templateId": {
-            "type": "string",
-            "description": "The template to render this living document from. Must have a published version."
-          },
-          "version": {
-            "type": "number",
-            "description": "Pin a specific published template version to freeze for this identity's whole life. Defaults to the template's current published version. Reissuing changes the data, never the design.",
-            "minimum": 1
-          },
-          "payload": {
-            "type": "object",
-            "description": "The payload for the first issued version, validated against the pinned schema."
-          },
-          "name": {
-            "type": "string",
-            "description": "A human label for the living document.",
-            "maxLength": 200
-          },
-          "publicAlias": {
-            "type": "boolean",
-            "description": "Publish a public /d/:alias link that always resolves to the latest version. Requires the publicAlias plan capability. The alias is an unguessable capability token."
-          }
-        },
-        "required": [
-          "templateId",
-          "payload"
-        ]
-      },
-      "ReissueLivingDocumentDto": {
-        "type": "object",
-        "properties": {
-          "payload": {
-            "type": "object",
-            "description": "The new payload for this version, validated against the identity's pinned schema."
-          }
-        },
-        "required": [
-          "payload"
-        ]
-      },
       "ValidateFormDto": {
         "type": "object",
         "properties": {
@@ -4266,6 +5769,451 @@
         },
         "required": [
           "data"
+        ]
+      },
+      "CreateObjectTypeDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "supplier",
+            "description": "Stable machine name, unique within the account. Lower-case letters, digits and underscores. Object numbers and relationship rules are written against it, so it is not intended to change once objects exist."
+          },
+          "nameSingular": {
+            "type": "string",
+            "example": "Supplier",
+            "description": "Singular display name."
+          },
+          "namePlural": {
+            "type": "string",
+            "example": "Suppliers",
+            "description": "Plural display name."
+          },
+          "description": {
+            "type": "string",
+            "description": "What this kind of record is for."
+          },
+          "schema": {
+            "type": "object",
+            "description": "JSON Schema for the record's data, optionally annotated with the x-pw-* vocabulary: `x-pw-sensitive` (encrypted at rest and withheld from ordinary reads), `x-pw-title`, `x-pw-listable`, `x-pw-searchable`, `x-pw-classification`, `x-pw-permission`, `x-pw-immutable`. Unknown x-pw-* keys are rejected rather than ignored, so a misspelled annotation cannot publish as though it applied. Defaults to an empty object schema.",
+            "example": {
+              "type": "object",
+              "required": [
+                "name"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "x-pw-title": true,
+                  "x-pw-listable": true
+                },
+                "taxId": {
+                  "type": "string",
+                  "x-pw-sensitive": true
+                }
+              }
+            }
+          },
+          "uiSchema": {
+            "type": "object",
+            "description": "Presentation hints. Never affects validation, and deliberately excluded from the version hash, so renaming a label is not a contract change."
+          },
+          "policyOverlay": {
+            "type": "object",
+            "description": "Path-keyed field policies for a schema that cannot carry inline annotations, for example one generated by another system. Keys are dotted paths; a path that does not exist in the schema is an error, not a no-op, because a policy naming `taxID` against a field called `taxId` would leave the value in the clear.",
+            "example": {
+              "taxId": {
+                "sensitive": true
+              },
+              "name": {
+                "title": true
+              }
+            }
+          },
+          "lifecycle": {
+            "type": "object",
+            "description": "Record states and allowed transitions. Stored and frozen; not yet enforced."
+          },
+          "search": {
+            "type": "object",
+            "description": "Search configuration. Stored and frozen; not yet consumed."
+          },
+          "accessPolicy": {
+            "type": "object",
+            "description": "Role allow-lists narrowing who may reach records of this type: `view`, `write`, `viewSensitive`, and `apiAccess`. A list can only REMOVE access a role already holds from the account's role matrix, never add it, so naming a Viewer under `write` grants nothing. Omit a list to leave that power to the account matrix alone. Set `apiAccess` to false to make the type reachable only by signed-in people and never by an API key. It is not part of the versioned contract, so changing it does not publish a new version.",
+            "example": {
+              "view": [
+                "account_owner",
+                "admin",
+                "operator"
+              ],
+              "viewSensitive": [
+                "account_owner"
+              ]
+            }
+          }
+        },
+        "required": [
+          "key",
+          "nameSingular",
+          "namePlural"
+        ]
+      },
+      "UpdateObjectTypeDto": {
+        "type": "object",
+        "properties": {
+          "nameSingular": {
+            "type": "string",
+            "description": "New singular display name."
+          },
+          "namePlural": {
+            "type": "string",
+            "description": "New plural display name."
+          },
+          "description": {
+            "type": "string",
+            "description": "New description."
+          },
+          "schema": {
+            "type": "object",
+            "description": "Replacement JSON Schema for the draft."
+          },
+          "uiSchema": {
+            "type": "object",
+            "description": "Replacement presentation hints."
+          },
+          "policyOverlay": {
+            "type": "object",
+            "description": "Replacement path-keyed field-policy overlay."
+          },
+          "lifecycle": {
+            "type": "object",
+            "description": "Replacement lifecycle configuration."
+          },
+          "search": {
+            "type": "object",
+            "description": "Replacement search configuration."
+          },
+          "accessPolicy": {
+            "type": "object",
+            "description": "Replacement access policy. Role allow-lists narrowing who may reach records of this type: `view`, `write`, `viewSensitive`, and `apiAccess`. A list can only REMOVE access a role already holds from the account's role matrix, never add it, so naming a Viewer under `write` grants nothing. Omit a list to leave that power to the account matrix alone. Set `apiAccess` to false to make the type reachable only by signed-in people and never by an API key. It is not part of the versioned contract, so changing it does not publish a new version."
+          }
+        }
+      },
+      "PublishObjectTypeDto": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "description": "A short note recorded against the version, for the history."
+          }
+        }
+      },
+      "DeprecateObjectTypeDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "replaced by the vendor type",
+            "description": "Why the type is being retired. Recorded in the audit trail."
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CreateObjectDto": {
+        "type": "object",
+        "properties": {
+          "objectTypeKey": {
+            "type": "string",
+            "example": "supplier",
+            "description": "The object type's key. Send this or `objectTypeId`, not both."
+          },
+          "objectTypeId": {
+            "type": "string",
+            "description": "The object type's id. Send this or `objectTypeKey`."
+          },
+          "data": {
+            "type": "object",
+            "description": "The record's complete value, validated against the type's current published version. Fields the type marks sensitive are removed from ordinary storage and encrypted before anything is written.",
+            "example": {
+              "name": "Acme Ltd",
+              "taxId": "GB123456789",
+              "country": "GB"
+            }
+          },
+          "number": {
+            "type": "string",
+            "example": "ACME/2024/17",
+            "description": "Use the identifier the record already carries in another system. Omit it and one is allocated (`SUPPLIER-000042`), gap-free per type. A supplied number never advances the generated sequence, so importing does not create gaps in it."
+          },
+          "lifecycleState": {
+            "type": "string",
+            "description": "Your own state for the record, from the type's lifecycle configuration."
+          },
+          "ownerUserId": {
+            "type": "string",
+            "description": "The account member who owns the record operationally."
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "restricted"
+            ],
+            "description": "Override the classification derived from the type's field policies. It may only TIGHTEN what the fields imply, never loosen it."
+          },
+          "changeReason": {
+            "type": "string",
+            "description": "Why the record was created. Kept on the version."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where the write came from, for the history: `api`, `import`, `workflow`."
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "description": "Equivalent to the `Idempotency-Key` header; the header wins if both are sent. Reusing a key with a different request returns 409 rather than replaying the first one."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateObjectDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "description": "The record's complete new value, sensitive fields included.",
+            "example": {
+              "name": "Acme Ltd",
+              "taxId": "GB123456789",
+              "country": "IE"
+            }
+          },
+          "expectedVersion": {
+            "type": "number",
+            "example": 3,
+            "description": "The version you believe you are editing. A mismatch is 409, never a silent overwrite: two writers who both read version 3 are separated here rather than one losing their work invisibly. REQUIRED, but may be sent as the `If-Match` header instead of this field; this field wins if both are present."
+          },
+          "lifecycleState": {
+            "type": "string",
+            "description": "New lifecycle state."
+          },
+          "ownerUserId": {
+            "type": "string",
+            "description": "New operational owner."
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "restricted"
+            ],
+            "description": "Tighten the classification."
+          },
+          "changeReason": {
+            "type": "string",
+            "description": "Why the record changed. Kept on the new version."
+          },
+          "source": {
+            "type": "string",
+            "description": "Where the write came from."
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ArchiveObjectDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "supplier no longer trading",
+            "description": "Why the record is being archived. Recorded in the audit trail."
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CreateRelationshipDto": {
+        "type": "object",
+        "properties": {
+          "relationshipTypeKey": {
+            "type": "string",
+            "example": "supplies",
+            "description": "The relationship type's key. Send this or `relationshipTypeId`."
+          },
+          "relationshipTypeId": {
+            "type": "string",
+            "description": "The relationship type's id."
+          },
+          "targetObjectId": {
+            "type": "string",
+            "description": "The record at the far end. The object in the path is the SOURCE; this is the target."
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Facts about the EDGE rather than about either record: a share percentage, a contract role, a rank. Validated against the relationship type's metadata schema when it declares one."
+          }
+        },
+        "required": [
+          "targetObjectId"
+        ]
+      },
+      "EndRelationshipDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "contract novated",
+            "description": "Why the relationship ended. Kept on the row."
+          }
+        }
+      },
+      "LinkDocumentDto": {
+        "type": "object",
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "description": "The document id returned by POST /v1/documents."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "supporting",
+              "evidence",
+              "generated_for",
+              "correspondence"
+            ],
+            "description": "Why the document belongs to this record. The same document may be filed under more than one role, and each role is a separate fact. Defaults to `primary`."
+          }
+        },
+        "required": [
+          "documentId"
+        ]
+      },
+      "CreateRelationshipTypeDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "supplies",
+            "description": "Stable machine name, unique within the account."
+          },
+          "label": {
+            "type": "string",
+            "example": "supplies",
+            "description": "How the edge reads from the source record to the target."
+          },
+          "inverseLabel": {
+            "type": "string",
+            "example": "supplied by",
+            "description": "How it reads from the target back to the source. Required, because an edge with no inverse label is unreadable from half the places it is shown."
+          },
+          "description": {
+            "type": "string",
+            "description": "What the relationship means."
+          },
+          "sourceTypeKeys": {
+            "example": [
+              "supplier"
+            ],
+            "description": "Object type keys allowed at the SOURCE end. An empty list (the default) means any type, which is what a generic edge like `relates_to` wants. A key naming a type that does not exist is rejected rather than stored, because an allow-list matching nothing would refuse every edge for the wrong reason.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "targetTypeKeys": {
+            "example": [
+              "contract"
+            ],
+            "description": "Object type keys allowed at the TARGET end. Empty means any type.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "one_to_one",
+              "one_to_many",
+              "many_to_one",
+              "many_to_many"
+            ],
+            "description": "How many live edges each end may carry, read source-to-target. `one_to_many` means one source may hold many targets, and each TARGET may be held by only one source. Defaults to `many_to_many`."
+          },
+          "metadataSchema": {
+            "type": "object",
+            "description": "Optional JSON Schema for each edge's `metadata`, compiled under the same validator your record data is checked with, so metadata cannot be accepted here and rejected there."
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "inverseLabel"
+        ]
+      },
+      "UpdateRelationshipTypeDto": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "inverseLabel": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "sourceTypeKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "targetTypeKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cardinality": {
+            "type": "string",
+            "enum": [
+              "one_to_one",
+              "one_to_many",
+              "many_to_one",
+              "many_to_many"
+            ]
+          },
+          "metadataSchema": {
+            "type": "object"
+          }
+        }
+      },
+      "DeprecateRelationshipTypeDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "example": "replaced by governed_by",
+            "description": "Why it is being retired. Recorded in the audit trail."
+          }
+        },
+        "required": [
+          "reason"
         ]
       }
     }
