@@ -1,4 +1,4 @@
-import { apiErrorForStatus, PageWeaverApiError, PageWeaverConnectionError } from "./errors";
+import { apiErrorForStatus, PageWeaverAPIError, PageWeaverConnectionError } from "./errors";
 
 /** A `fetch` implementation compatible with the global one (Node 18+, browsers, undici). */
 export type FetchLike = (
@@ -57,7 +57,7 @@ const SAFE_METHODS: ReadonlySet<string> = new Set(["GET", "HEAD", "PUT", "DELETE
 
 /**
  * Thin fetch wrapper: attaches the API key, serializes JSON, applies a timeout, retries transient
- * failures with backoff, and maps non-2xx responses to a typed {@link PageWeaverApiError} subclass
+ * failures with backoff, and maps non-2xx responses to a typed {@link PageWeaverAPIError} subclass
  * and transport failures to {@link PageWeaverConnectionError}. Every resource is built on this.
  */
 export class HttpClient {
@@ -154,7 +154,7 @@ export class HttpClient {
 
   /**
    * Perform a request and return the raw {@link Response} (2xx only; non-2xx still throws a
-   * {@link PageWeaverApiError}). For content-negotiated endpoints where the body may be JSON or bytes
+   * {@link PageWeaverAPIError}). For content-negotiated endpoints where the body may be JSON or bytes
    * depending on the response — e.g. synchronous create, which returns PDF, a document, or a 202.
    */
   request(
@@ -281,7 +281,7 @@ export class HttpClient {
   }
 
   private wrapTransport(err: unknown): PageWeaverConnectionError {
-    if (err instanceof PageWeaverApiError) throw err;
+    if (err instanceof PageWeaverAPIError) throw err;
     const aborted = err instanceof Error && err.name === "AbortError";
     return new PageWeaverConnectionError(
       aborted
@@ -324,7 +324,7 @@ function parseRetryAfter(value: string | null): number | undefined {
   return undefined;
 }
 
-async function toApiError(res: Response): Promise<PageWeaverApiError> {
+async function toApiError(res: Response): Promise<PageWeaverAPIError> {
   const raw = await safeText(res);
   let body: unknown = raw;
   try {

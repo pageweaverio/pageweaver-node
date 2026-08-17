@@ -2639,7 +2639,7 @@ export interface ErrorCatalogEntry {
   failClosed?: boolean;
 }
 
-/** `GET /v1/errors` — the full public error-code catalog, for building typed handling around `PageWeaverApiError.code`. */
+/** `GET /v1/errors` — the full public error-code catalog, for building typed handling around `PageWeaverAPIError.code`. */
 export interface ErrorCatalogResponse {
   domains: readonly string[];
   codes: readonly ErrorCatalogEntry[];

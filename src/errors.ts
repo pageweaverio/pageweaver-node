@@ -33,10 +33,10 @@ export interface ApiErrorArgs {
  * Prefer catching one of the specific subclasses below ({@link PageWeaverAuthenticationError},
  * {@link PageWeaverPermissionError}, {@link PageWeaverNotFoundError}, {@link PageWeaverConflictError},
  * {@link PageWeaverValidationError}, {@link PageWeaverRateLimitError}, {@link PageWeaverServerError}) when
- * you want to branch on the failure kind; every one of them is also a `PageWeaverApiError`, so a single
- * `catch (err) { if (err instanceof PageWeaverApiError) ... }` still catches all of them.
+ * you want to branch on the failure kind; every one of them is also a `PageWeaverAPIError`, so a single
+ * `catch (err) { if (err instanceof PageWeaverAPIError) ... }` still catches all of them.
  */
-export class PageWeaverApiError extends PageWeaverError {
+export class PageWeaverAPIError extends PageWeaverError {
   readonly status: number;
   readonly code?: string;
   readonly errors?: unknown;
@@ -46,7 +46,7 @@ export class PageWeaverApiError extends PageWeaverError {
 
   constructor(args: ApiErrorArgs) {
     super(args.message);
-    this.name = "PageWeaverApiError";
+    this.name = "PageWeaverAPIError";
     this.status = args.status;
     this.code = args.code;
     this.errors = args.errors;
@@ -62,7 +62,7 @@ export class PageWeaverApiError extends PageWeaverError {
 }
 
 /** `401` — the API key is missing, malformed, revoked, or the account is suspended/scheduled for deletion. */
-export class PageWeaverAuthenticationError extends PageWeaverApiError {
+export class PageWeaverAuthenticationError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverAuthenticationError";
@@ -79,7 +79,7 @@ const SCOPE_MISSING_CODE = "authorization.scope_missing";
  * policy). This is a credential problem, distinct from {@link PageWeaverPlanRequiredError} (a billing
  * problem: the credential is fine, the feature isn't on the plan at all).
  */
-export class PageWeaverPermissionError extends PageWeaverApiError {
+export class PageWeaverPermissionError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverPermissionError";
@@ -102,7 +102,7 @@ export class PageWeaverPermissionError extends PageWeaverApiError {
 }
 
 /** `404` — no such resource, or it belongs to another tenant (the API never distinguishes the two). */
-export class PageWeaverNotFoundError extends PageWeaverApiError {
+export class PageWeaverNotFoundError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverNotFoundError";
@@ -110,7 +110,7 @@ export class PageWeaverNotFoundError extends PageWeaverApiError {
 }
 
 /** `409` — an optimistic-concurrency mismatch (`expectedVersion`/`If-Match`), a duplicate key, or a state conflict. */
-export class PageWeaverConflictError extends PageWeaverApiError {
+export class PageWeaverConflictError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverConflictError";
@@ -118,7 +118,7 @@ export class PageWeaverConflictError extends PageWeaverApiError {
 }
 
 /** `400` / `422` — the request body or query failed validation. `errors` carries the field-level detail when present. */
-export class PageWeaverValidationError extends PageWeaverApiError {
+export class PageWeaverValidationError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverValidationError";
@@ -132,7 +132,7 @@ export class PageWeaverValidationError extends PageWeaverApiError {
  * successfully until the account upgrades — contrast with {@link PageWeaverPermissionError}, where the
  * feature is available but this specific key isn't allowed to use it.
  */
-export class PageWeaverPlanRequiredError extends PageWeaverApiError {
+export class PageWeaverPlanRequiredError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverPlanRequiredError";
@@ -140,7 +140,7 @@ export class PageWeaverPlanRequiredError extends PageWeaverApiError {
 }
 
 /** `429` — rate limited or over a usage quota. `retryAfterSeconds` is set when the API sent `Retry-After`. */
-export class PageWeaverRateLimitError extends PageWeaverApiError {
+export class PageWeaverRateLimitError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverRateLimitError";
@@ -148,15 +148,15 @@ export class PageWeaverRateLimitError extends PageWeaverApiError {
 }
 
 /** `5xx` — the API failed unexpectedly. Safe to retry (the HTTP client already retries these automatically). */
-export class PageWeaverServerError extends PageWeaverApiError {
+export class PageWeaverServerError extends PageWeaverAPIError {
   constructor(args: ApiErrorArgs) {
     super(args);
     this.name = "PageWeaverServerError";
   }
 }
 
-/** Build the right {@link PageWeaverApiError} subclass for a status code. */
-export function apiErrorForStatus(args: ApiErrorArgs): PageWeaverApiError {
+/** Build the right {@link PageWeaverAPIError} subclass for a status code. */
+export function apiErrorForStatus(args: ApiErrorArgs): PageWeaverAPIError {
   switch (args.status) {
     case 400:
     case 422:
@@ -174,7 +174,7 @@ export function apiErrorForStatus(args: ApiErrorArgs): PageWeaverApiError {
     case 429:
       return new PageWeaverRateLimitError(args);
     default:
-      return args.status >= 500 ? new PageWeaverServerError(args) : new PageWeaverApiError(args);
+      return args.status >= 500 ? new PageWeaverServerError(args) : new PageWeaverAPIError(args);
   }
 }
 

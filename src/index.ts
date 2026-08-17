@@ -33,7 +33,7 @@ export { EventsResource } from "./events";
 
 export {
   PageWeaverError,
-  PageWeaverApiError,
+  PageWeaverAPIError,
   PageWeaverAuthenticationError,
   PageWeaverPermissionError,
   PageWeaverNotFoundError,

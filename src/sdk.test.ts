@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PageWeaver } from "./client";
-import { PageWeaverApiError, PageWeaverDocumentFailedError } from "./errors";
+import { PageWeaverAPIError, PageWeaverDocumentFailedError } from "./errors";
 import {
   signWebhookBody,
   verifyWebhook,
@@ -351,7 +351,7 @@ test("documents.waitFor throws PageWeaverDocumentFailedError on failure", async 
   );
 });
 
-test("a non-2xx response becomes a PageWeaverApiError carrying status + errors", async () => {
+test("a non-2xx response becomes a PageWeaverAPIError carrying status + errors", async () => {
   const { fetch } = mockFetch([
     json(400, {
       message: "Payload failed validation",
@@ -367,7 +367,7 @@ test("a non-2xx response becomes a PageWeaverApiError carrying status + errors",
   await assert.rejects(
     () => pw.documents.create({ templateId: "t", payload: {} }),
     (err: unknown) => {
-      assert.ok(err instanceof PageWeaverApiError);
+      assert.ok(err instanceof PageWeaverAPIError);
       assert.equal(err.status, 400);
       assert.equal(err.message, "Payload failed validation");
       assert.deepEqual(err.errors, [{ path: "/total" }]);

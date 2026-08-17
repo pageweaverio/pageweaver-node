@@ -55,7 +55,7 @@ const doc = await pw.documents.create({
 // { id, status: "queued", version }
 ```
 
-The payload is validated against the template's JSON Schema before the render is queued. A validation failure throws a `PageWeaverApiError` (status 400) whose `errors` field lists what was wrong.
+The payload is validated against the template's JSON Schema before the render is queued. A validation failure throws a `PageWeaverAPIError` (status 400) whose `errors` field lists what was wrong.
 
 ### From inline HTML
 
@@ -316,7 +316,7 @@ await pw.documents.list({}, undefined); // reads always retry by default; pass {
 
 ## Errors
 
-Every error extends `PageWeaverError`. A non-2xx API response throws a `PageWeaverApiError` subclass selected by status, so you can catch the specific failure kind — or just `PageWeaverApiError` to catch all of them:
+Every error extends `PageWeaverError`. A non-2xx API response throws a `PageWeaverAPIError` subclass selected by status, so you can catch the specific failure kind — or just `PageWeaverAPIError` to catch all of them:
 
 | Class | Status | Thrown when |
 | --- | --- | --- |
@@ -328,7 +328,7 @@ Every error extends `PageWeaverError`. A non-2xx API response throws a `PageWeav
 | `PageWeaverConflictError` | 409 | An `expectedVersion`/`If-Match` mismatch, a duplicate key, or a state conflict. |
 | `PageWeaverRateLimitError` | 429 | Rate limited or over a usage quota. `retryAfterSeconds` when the API sent `Retry-After`. |
 | `PageWeaverServerError` | 5xx | The API failed unexpectedly. |
-| `PageWeaverApiError` | any | The base class — every subclass above extends it, and it also covers any other status. |
+| `PageWeaverAPIError` | any | The base class — every subclass above extends it, and it also covers any other status. |
 | `PageWeaverInvalidRequestError` | — | A client-side shape check failed before any request was sent (e.g. a blank id). |
 | `PageWeaverConnectionError` | — | A network failure, or the request timed out. |
 | `PageWeaverTimeoutError` | — | `waitFor` exceeded its timeout before the document finished. |
@@ -341,7 +341,7 @@ import {
   PageWeaverRateLimitError,
   PageWeaverPlanRequiredError,
   PageWeaverPermissionError,
-  PageWeaverApiError,
+  PageWeaverAPIError,
 } from "@pageweaver/sdk";
 
 try {
@@ -358,7 +358,7 @@ try {
     // A credential problem: this specific API key isn't allowed to do this.
     if (err.isScopeMissing) console.error(`Mint a key with the '${err.requiredScope}' scope.`);
     else console.error("Forbidden:", err.message);
-  } else if (err instanceof PageWeaverApiError) {
+  } else if (err instanceof PageWeaverAPIError) {
     console.error(err.code, err.status, err.requestId);
   } else {
     throw err;
