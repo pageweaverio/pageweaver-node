@@ -221,31 +221,161 @@ app.post("/webhooks/pageweaver", express.raw({ type: "application/json" }), (req
 
 Always verify against the unparsed body. Re-serializing a parsed object can change the bytes and break the signature.
 
-## Errors
-
-Every error extends `PageWeaverError`:
-
-| Class | Thrown when |
-| --- | --- |
-| `PageWeaverApiError` | The API returned a non-2xx response. Carries `status`, `code`, `errors`, `body`. |
-| `PageWeaverConnectionError` | A network failure, or the request timed out. |
-| `PageWeaverTimeoutError` | `waitFor` exceeded its timeout before the document finished. |
-| `PageWeaverDocumentFailedError` | The document reached the `failed` state while waiting. Carries the `document`. |
-| `PageWeaverWebhookSignatureError` | A webhook signature did not match the body. |
+## Document lineage: trust, diff, versions, representations
 
 ```ts
-import { PageWeaverApiError } from "@pageweaver/sdk";
+await pw.documents.trust("doc_1"); // one deterministic integrity + provenance manifest
+await pw.documents.diff("doc_1", "doc_2"); // causal diff between two documents; never renders or meters
+
+// Reissue a template-pinned document under the same lineage (fires `document.superseded`):
+await pw.documents.appendVersion("doc_1", { payload: { total: 51 } });
+await pw.documents.versions("doc_1"); // the full lineage, newest first
+await pw.documents.representations("doc_1"); // every artifact of one version (PDF, e-invoice XML, JSON twin, ...)
+```
+
+## Typed business records (objects, object types, relationships)
+
+Requires an API key with the matching scope — `objects:read` / `objects:write` / `object-types:manage` / `relationships:manage`; see [Scopes](#scopes).
+
+```ts
+// Define a record type, then publish it (freezes an immutable version):
+const type = await pw.objectTypes.create({
+  key: "invoice",
+  nameSingular: "Invoice",
+  namePlural: "Invoices",
+  schema: { type: "object", properties: { total: { type: "number" } } },
+});
+await pw.objectTypes.publish(type.id);
+
+// Create + replace a record. `replace` requires expectedVersion — a 409 on mismatch, never a lost update.
+const invoice = await pw.objects.create({ objectTypeKey: "invoice", data: { total: 42 } });
+await pw.objects.replace(invoice.id, { data: { total: 51 }, expectedVersion: invoice.version });
+
+// Relate records, and file a rendered document against one:
+await pw.objects.addRelationship(invoice.id, { relationshipTypeKey: "billed_to", targetObjectId: customer.id });
+await pw.objects.linkDocument(invoice.id, { documentId: doc.id, role: "primary" });
+```
+
+## Search, domain events, and the error registry
+
+```ts
+await pw.search.query({ q: "acme invoice", subjectType: "object" }); // requires the search:read scope
+
+// The append-only event ledger — resume from `nextCursor`, not the last event you saw:
+for await (const event of pw.events.listAll({ type: "document.completed" })) {
+  console.log(event.type, event.subjectId);
+}
+
+await pw.errorCodes.list(); // the full public error-code catalog (no API key required)
+```
+
+## Document ingestion and fillable PDFs
+
+```ts
+// Bring in a PDF you already have (not a template render):
+await pw.intake.create({ file: { data: bytes, filename: "scan.pdf" }, classification: "internal" });
+
+// Large files: a resumable chunked session.
+const session = await pw.intake.sessions.create({ filename: "big.pdf", totalBytes, chunkSize });
+await pw.intake.sessions.uploadChunk(session.id, 0, chunk0);
+await pw.intake.sessions.finalize(session.id);
+
+// Fill an uploaded PDF's own AcroForm fields (not a Liquid template):
+const template = await pw.formTemplates.create({ name: "Claim form", file: { data: bytes, filename: "claim.pdf" } });
+await pw.formTemplates.fill(template.id, { payload: { "claimant.fullName": "Ada Lovelace" } });
+```
+
+## Scopes
+
+Every API key carries the baseline `read` + `render` scopes. Everything else is opt-in, set per key in the portal:
+
+| Scope | Gates |
+| --- | --- |
+| `review` | Comments, reviews, share links |
+| `deploy` | Environments, deployments, template proposals |
+| `objects:read` / `objects:write` | Reading / writing typed business records |
+| `objects:read-sensitive` | Decrypting a record's sensitive fields (stacks on `objects:read`) |
+| `object-types:manage` | Defining and publishing object types |
+| `relationships:manage` | Object relationships, and filing documents against objects |
+| `documents:upload` | Document intake and fillable-form-template uploads |
+| `search:read` | `pw.search.query()` |
+| `workflows:read` | `pw.workflowDefinitions.*` |
+
+A call missing a required scope fails with a `403` — a `PageWeaverPermissionError` (see below).
+
+## Retries
+
+GET/HEAD/PUT/DELETE requests, and any POST sent with an `idempotencyKey`, are retried automatically on `429` and `5xx` with exponential backoff + jitter (honoring `Retry-After` on `429`). A plain POST with no idempotency key is never retried, since a duplicate render or record is worse than a failed request. Tune it per client or per call:
+
+```ts
+const pw = new PageWeaver({ apiKey, retry: { maxRetries: 3, baseDelayMs: 500, maxDelayMs: 8000 } });
+
+// Disable retries for one call:
+await pw.documents.list({}, undefined); // reads always retry by default; pass { retry: { maxRetries: 0 } } via a lower-level call to opt out
+```
+
+## Errors
+
+Every error extends `PageWeaverError`. A non-2xx API response throws a `PageWeaverApiError` subclass selected by status, so you can catch the specific failure kind — or just `PageWeaverApiError` to catch all of them:
+
+| Class | Status | Thrown when |
+| --- | --- | --- |
+| `PageWeaverValidationError` | 400 / 422 | The request body or query failed validation. `errors` carries field-level detail. |
+| `PageWeaverAuthenticationError` | 401 | The API key is missing, invalid, or the account is suspended. |
+| `PageWeaverPlanRequiredError` | 402 | A billing problem, not a credential one: the account's plan doesn't include this capability at all — no key, however scoped, can call it until the account upgrades. |
+| `PageWeaverPermissionError` | 403 | A credential problem: the key authenticated fine but isn't allowed to do this. Check `err.isScopeMissing` / `err.requiredScope` when it's a missing scope. |
+| `PageWeaverNotFoundError` | 404 | No such resource (or it belongs to another account). |
+| `PageWeaverConflictError` | 409 | An `expectedVersion`/`If-Match` mismatch, a duplicate key, or a state conflict. |
+| `PageWeaverRateLimitError` | 429 | Rate limited or over a usage quota. `retryAfterSeconds` when the API sent `Retry-After`. |
+| `PageWeaverServerError` | 5xx | The API failed unexpectedly. |
+| `PageWeaverApiError` | any | The base class — every subclass above extends it, and it also covers any other status. |
+| `PageWeaverInvalidRequestError` | — | A client-side shape check failed before any request was sent (e.g. a blank id). |
+| `PageWeaverConnectionError` | — | A network failure, or the request timed out. |
+| `PageWeaverTimeoutError` | — | `waitFor` exceeded its timeout before the document finished. |
+| `PageWeaverDocumentFailedError` | — | The document reached the `failed` state while waiting. Carries the `document`. |
+| `PageWeaverWebhookSignatureError` | — | A webhook signature did not match the body. |
+
+```ts
+import {
+  PageWeaverValidationError,
+  PageWeaverRateLimitError,
+  PageWeaverPlanRequiredError,
+  PageWeaverPermissionError,
+  PageWeaverApiError,
+} from "@pageweaver/sdk";
 
 try {
-  await pw.documents.create({ templateId: "t", payload });
+  await pw.documents.create({ templateId: "t", payload, output: { format: "facturx" } });
 } catch (err) {
-  if (err instanceof PageWeaverApiError && err.status === 400) {
+  if (err instanceof PageWeaverValidationError) {
     console.error("Validation failed:", err.errors);
+  } else if (err instanceof PageWeaverRateLimitError) {
+    console.error("Rate limited, retry after", err.retryAfterSeconds, "seconds");
+  } else if (err instanceof PageWeaverPlanRequiredError) {
+    // A billing problem: the account's plan doesn't include this feature at all.
+    console.error("Upgrade required:", err.message);
+  } else if (err instanceof PageWeaverPermissionError) {
+    // A credential problem: this specific API key isn't allowed to do this.
+    if (err.isScopeMissing) console.error(`Mint a key with the '${err.requiredScope}' scope.`);
+    else console.error("Forbidden:", err.message);
+  } else if (err instanceof PageWeaverApiError) {
+    console.error(err.code, err.status, err.requestId);
   } else {
     throw err;
   }
 }
 ```
+
+Look up any `err.code` in `pw.errorCodes.list()` for its cause and resolution. `PageWeaverPlanRequiredError` (402) and `PageWeaverPermissionError` (403) are easy to conflate — both read as "you can't do that" — but the fix differs: a plan error is resolved by the account upgrading, a scope error by minting a new API key with the missing scope. Branch on the class, not the status code.
+
+## Migrating off living documents
+
+The `/v1/living-documents/*` surface (and the SDK's old `pw.livingDocuments` resource) has been retired and
+folded into ordinary documents:
+
+- `livingDocuments.create({ templateId, payload, publicAlias })` → `documents.create({ templateId, payload, publicAlias: true })`. The minted link comes back as `result.alias.token` instead of a separate identity.
+- `livingDocuments.reissue(id, { payload })` → `documents.appendVersion(documentId, { payload })`.
+- `livingDocuments.get(id)` / `.list()` / `.version(id, seq)` → `documents.versions(documentId)` / `documents.version(documentId, seq)`.
 
 ## License
 

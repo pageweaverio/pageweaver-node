@@ -1462,3 +1462,449 @@ test("submissions.get GETs /v1/submissions/:id", async () => {
   assert.equal(sub.renderJobId, "doc_9");
   assert.equal(calls[0]?.url, "http://api.test/v1/submissions/sbm_1");
 });
+
+// ─── Typed errors + retry/backoff (hardening) ────────────────────────────────
+
+test("a 404 becomes a PageWeaverNotFoundError; a 429 becomes a PageWeaverRateLimitError", async () => {
+  const { PageWeaverNotFoundError, PageWeaverRateLimitError } = await import("./errors");
+  {
+    const { fetch } = mockFetch([json(404, { message: "not found" })]);
+    const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch, retry: { maxRetries: 0 } });
+    await assert.rejects(() => pw.documents.get("doc_missing"), (err: unknown) => {
+      assert.ok(err instanceof PageWeaverNotFoundError);
+      assert.equal((err as InstanceType<typeof PageWeaverNotFoundError>).status, 404);
+      return true;
+    });
+  }
+  {
+    const { fetch } = mockFetch([
+      new Response(JSON.stringify({ message: "rate limited" }), {
+        status: 429,
+        headers: { "content-type": "application/json", "retry-after": "1" },
+      }),
+    ]);
+    const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch, retry: { maxRetries: 0 } });
+    await assert.rejects(() => pw.documents.get("doc_x"), (err: unknown) => {
+      assert.ok(err instanceof PageWeaverRateLimitError);
+      assert.equal((err as InstanceType<typeof PageWeaverRateLimitError>).retryAfterSeconds, 1);
+      assert.equal((err as InstanceType<typeof PageWeaverRateLimitError>).isRetryable, true);
+      return true;
+    });
+  }
+});
+
+test("a 402 becomes a PageWeaverPlanRequiredError (a billing problem, not a credential one)", async () => {
+  const { PageWeaverPlanRequiredError, PageWeaverPermissionError } = await import("./errors");
+  const { fetch } = mockFetch([
+    json(402, { message: "Provenance receipts are not available on your plan. Upgrade to export receipts." }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch, retry: { maxRetries: 0 } });
+  await assert.rejects(() => pw.documents.receipt("doc_1"), (err: unknown) => {
+    assert.ok(err instanceof PageWeaverPlanRequiredError);
+    assert.ok(!(err instanceof PageWeaverPermissionError));
+    assert.equal((err as InstanceType<typeof PageWeaverPlanRequiredError>).status, 402);
+    return true;
+  });
+});
+
+test("a 403 scope refusal becomes a PageWeaverPermissionError with isScopeMissing + requiredScope", async () => {
+  const { PageWeaverPermissionError } = await import("./errors");
+  const { fetch } = mockFetch([
+    json(403, {
+      message: "This API key is missing the 'review' scope. Create a key with that scope to call this endpoint.",
+      code: "authorization.scope_missing",
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch, retry: { maxRetries: 0 } });
+  await assert.rejects(
+    () => pw.reviews.list(),
+    (err: unknown) => {
+      assert.ok(err instanceof PageWeaverPermissionError);
+      const perm = err as InstanceType<typeof PageWeaverPermissionError>;
+      assert.equal(perm.status, 403);
+      assert.equal(perm.isScopeMissing, true);
+      assert.equal(perm.requiredScope, "review");
+      return true;
+    },
+  );
+});
+
+test("a 403 with no scope_missing code is a PageWeaverPermissionError, but isScopeMissing is false", async () => {
+  const { PageWeaverPermissionError } = await import("./errors");
+  const { fetch } = mockFetch([json(403, { message: "This object type is not visible to your role." })]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch, retry: { maxRetries: 0 } });
+  await assert.rejects(
+    () => pw.objectTypes.get("obt_hidden"),
+    (err: unknown) => {
+      assert.ok(err instanceof PageWeaverPermissionError);
+      const perm = err as InstanceType<typeof PageWeaverPermissionError>;
+      assert.equal(perm.isScopeMissing, false);
+      assert.equal(perm.requiredScope, undefined);
+      return true;
+    },
+  );
+});
+
+test("a GET retries a 503 with backoff, then succeeds", async () => {
+  const { fetch, calls } = mockFetch([
+    new Response(JSON.stringify({ message: "unavailable" }), {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    }),
+    json(200, { id: "doc_1", status: "done", version: 1 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test",
+    baseUrl: "http://api.test",
+    fetch,
+    retry: { maxRetries: 2, baseDelayMs: 1, maxDelayMs: 2 },
+  });
+  const doc = await pw.documents.get("doc_1");
+  assert.equal(doc.status, "done");
+  assert.equal(calls.length, 2);
+});
+
+test("a POST without an idempotency key is never retried on 503", async () => {
+  const { fetch } = mockFetch([
+    new Response(JSON.stringify({ message: "unavailable" }), {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  await assert.rejects(() =>
+    pw.documents.create({ templateId: "tmpl_invoice", payload: {} }),
+  );
+});
+
+test("a POST WITH an idempotency key is retried on 503", async () => {
+  const { fetch, calls } = mockFetch([
+    new Response(JSON.stringify({ message: "unavailable" }), {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    }),
+    json(202, { id: "doc_1", status: "queued", version: 1 }),
+  ]);
+  const pw = new PageWeaver({
+    apiKey: "pk_test",
+    baseUrl: "http://api.test",
+    fetch,
+    retry: { maxRetries: 1, baseDelayMs: 1, maxDelayMs: 2 },
+  });
+  const res = await pw.documents.create({
+    templateId: "tmpl_invoice",
+    payload: {},
+    idempotencyKey: "idem-1",
+  });
+  assert.equal(res.id, "doc_1");
+  assert.equal(calls.length, 2);
+});
+
+// ─── Client-side request validation (no network call) ────────────────────────
+
+test("validation: a blank id is rejected before any request is sent", async () => {
+  const { PageWeaverInvalidRequestError } = await import("./errors");
+  const { fetch, calls } = mockFetch([]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  // These throw synchronously (the check runs before any network call), so assert.throws applies —
+  // not assert.rejects, which only inspects a promise's eventual rejection.
+  assert.throws(() => pw.documents.get(""), PageWeaverInvalidRequestError);
+  assert.throws(() => pw.objects.get("   "), PageWeaverInvalidRequestError);
+  assert.equal(calls.length, 0);
+});
+
+test("validation: objects.create requires exactly one of objectTypeKey/objectTypeId", async () => {
+  const { PageWeaverInvalidRequestError } = await import("./errors");
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch: mockFetch([]).fetch });
+  assert.throws(
+    () => pw.objects.create({ data: { a: 1 } } as Parameters<typeof pw.objects.create>[0]),
+    PageWeaverInvalidRequestError,
+  );
+  assert.throws(
+    () =>
+      pw.objects.create({
+        objectTypeKey: "invoice",
+        objectTypeId: "obt_1",
+        data: { a: 1 },
+      }),
+    PageWeaverInvalidRequestError,
+  );
+});
+
+test("validation: objects.replace requires a positive integer expectedVersion", async () => {
+  const { PageWeaverInvalidRequestError } = await import("./errors");
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch: mockFetch([]).fetch });
+  assert.throws(
+    () =>
+      pw.objects.replace(
+        "obj_1",
+        { data: { a: 1 } } as unknown as Parameters<typeof pw.objects.replace>[1],
+      ),
+    PageWeaverInvalidRequestError,
+  );
+});
+
+// ─── Object types / objects / relationship types ─────────────────────────────
+
+test("objectTypes.create posts to /v1/object-types and get/publish round-trip", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "obt_1", key: "invoice", nameSingular: "Invoice", namePlural: "Invoices", status: "draft" }),
+    json(200, { objectTypeId: "obt_1", version: 1, snapshotHash: "h", unchanged: false, policies: { fields: {}, sensitivePaths: [] } }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const created = await pw.objectTypes.create({
+    key: "invoice",
+    nameSingular: "Invoice",
+    namePlural: "Invoices",
+  });
+  assert.equal(created.id, "obt_1");
+  const published = await pw.objectTypes.publish("obt_1", { note: "initial" });
+  assert.equal(published.version, 1);
+  assert.equal(calls[0]?.url, "http://api.test/v1/object-types");
+  assert.equal(calls[1]?.url, "http://api.test/v1/object-types/obt_1/publish");
+});
+
+test("objects.create sends the Idempotency-Key header and strips it from the body", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "obj_1", objectTypeId: "obt_1", number: "INV-1", version: 1, status: "active" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const obj = await pw.objects.create({
+    objectTypeKey: "invoice",
+    data: { total: 42 },
+    idempotencyKey: "idem-obj-1",
+  });
+  assert.equal(obj.id, "obj_1");
+  assert.equal(calls[0]?.headers["idempotency-key"], "idem-obj-1");
+  assert.deepEqual(calls[0]?.body, { objectTypeKey: "invoice", data: { total: 42 } });
+});
+
+test("objects.replace sends If-Match + expectedVersion and replaces the whole value", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { id: "obj_1", objectTypeId: "obt_1", number: "INV-1", version: 2, status: "active" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const obj = await pw.objects.replace("obj_1", { data: { total: 99 }, expectedVersion: 1 });
+  assert.equal(obj.version, 2);
+  assert.equal(calls[0]?.method, "PUT");
+  assert.equal(calls[0]?.headers["if-match"], "1");
+  assert.deepEqual(calls[0]?.body, { data: { total: 99 }, expectedVersion: 1 });
+});
+
+test("objects.addRelationship / endRelationship / linkDocument hit the sub-paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, {
+      id: "rel_1", relationshipTypeId: "rt_1", relationshipTypeKey: "invoices",
+      label: "invoices", inverseLabel: "invoiced by", sourceObjectId: "obj_1", targetObjectId: "obj_2",
+      metadata: null, validFrom: "t", validTo: null, endReason: null, unchanged: false,
+    }),
+    json(200, {
+      id: "rel_1", relationshipTypeId: "rt_1", relationshipTypeKey: "invoices",
+      label: "invoices", inverseLabel: "invoiced by", sourceObjectId: "obj_1", targetObjectId: "obj_2",
+      metadata: null, validFrom: "t", validTo: "t2", endReason: "done", unchanged: false,
+    }),
+    json(201, { id: "lnk_1", documentId: "doc_1", businessObjectId: "obj_1", role: "primary", createdAt: "t", unchanged: false }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  await pw.objects.addRelationship("obj_1", { relationshipTypeKey: "invoices", targetObjectId: "obj_2" });
+  await pw.objects.endRelationship("obj_1", "rel_1", { reason: "done" });
+  await pw.objects.linkDocument("obj_1", { documentId: "doc_1" });
+  assert.equal(calls[0]?.url, "http://api.test/v1/objects/obj_1/relationships");
+  assert.equal(calls[1]?.url, "http://api.test/v1/objects/obj_1/relationships/rel_1/end");
+  assert.equal(calls[2]?.url, "http://api.test/v1/objects/obj_1/documents");
+});
+
+test("relationshipTypes.create requires inverseLabel and posts to /v1/relationship-types", async () => {
+  const { PageWeaverInvalidRequestError } = await import("./errors");
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch: mockFetch([]).fetch });
+  assert.throws(
+    () =>
+      pw.relationshipTypes.create({
+        key: "invoices",
+        label: "invoices",
+      } as Parameters<typeof pw.relationshipTypes.create>[0]),
+    PageWeaverInvalidRequestError,
+  );
+
+  const { fetch, calls } = mockFetch([
+    json(201, {
+      id: "rt_1", key: "invoices", label: "invoices", inverseLabel: "invoiced by",
+      description: null, sourceTypeKeys: [], targetTypeKeys: [], cardinality: "many_to_many",
+      status: "active", createdAt: "t", updatedAt: "t",
+    }),
+  ]);
+  const pw2 = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const rt = await pw2.relationshipTypes.create({
+    key: "invoices",
+    label: "invoices",
+    inverseLabel: "invoiced by",
+  });
+  assert.equal(rt.id, "rt_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/relationship-types");
+});
+
+// ─── Search / events ───────────────────────────────────────────────────────
+
+test("search.query requires q and forwards filters as query params", async () => {
+  const { PageWeaverInvalidRequestError } = await import("./errors");
+  const pw0 = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch: mockFetch([]).fetch });
+  assert.throws(
+    () => pw0.search.query({ q: "" }),
+    PageWeaverInvalidRequestError,
+  );
+
+  const { fetch, calls } = mockFetch([json(200, { items: [], nextCursor: null })]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  await pw.search.query({ q: "acme invoice", subjectType: "object", limit: 10 });
+  assert.equal(
+    calls[0]?.url,
+    "http://api.test/v1/search?q=acme+invoice&subjectType=object&limit=10",
+  );
+});
+
+test("events.list forwards after/type/limit as query params", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { events: [], nextCursor: "42", latestSeq: "100" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const page = await pw.events.list({ after: "10", type: "document.completed", limit: 5 });
+  assert.equal(page.nextCursor, "42");
+  assert.equal(calls[0]?.url, "http://api.test/v1/events?after=10&limit=5&type=document.completed");
+});
+
+test("events.listAll follows nextCursor until a page comes back empty", async () => {
+  const { fetch } = mockFetch([
+    json(200, { events: [{ id: "e1", seq: "1", type: "t", version: 1, subjectType: null, subjectId: null, payload: {}, correlationId: null, at: "t" }], nextCursor: "1", latestSeq: "2" }),
+    json(200, { events: [], nextCursor: null, latestSeq: "2" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const seen: string[] = [];
+  for await (const event of pw.events.listAll()) seen.push(event.id);
+  assert.deepEqual(seen, ["e1"]);
+});
+
+// ─── Document lineage: trust, diff, versions, representations ───────────────
+
+test("documents.trust / diff / appendVersion / versions / representations hit the right sub-paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { documentId: "doc_1", status: "done", schemaId: null, schemaVersion: null, templateId: "tmpl_1", version: 1, artifactHash: "h", contentHash: "c", hashAlg: "sha256", chainSeq: 1, chainVerified: true, signature: null }),
+    json(200, {
+      a: { documentId: "doc_1", status: "done" }, b: { documentId: "doc_2", status: "done" },
+      classification: "payload_only", payload: { comparable: true, changes: [] },
+      template: { comparable: true, changed: false, templateIdA: "t", templateIdB: "t", versionA: 1, versionB: 1 },
+      optionsDelta: [], pageDelta: 0, integrity: { contentHashA: "a", contentHashB: "b", identical: false },
+    }),
+    json(202, { documentId: "doc_1", document: { id: "doc_3", status: "queued" } }),
+    json(200, { documentId: "doc_1", versions: [] }),
+    json(200, { documentId: "doc_1", documentVersion: 1, representations: [] }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  await pw.documents.trust("doc_1");
+  await pw.documents.diff("doc_1", "doc_2");
+  await pw.documents.appendVersion("doc_1", { payload: { total: 1 } });
+  await pw.documents.versions("doc_1");
+  await pw.documents.representations("doc_1", { version: 1 });
+  assert.equal(calls[0]?.url, "http://api.test/v1/documents/doc_1/trust");
+  assert.equal(calls[1]?.url, "http://api.test/v1/documents/doc_1/diff?against=doc_2");
+  assert.equal(calls[2]?.url, "http://api.test/v1/documents/doc_1/versions");
+  assert.equal(calls[2]?.method, "POST");
+  assert.equal(calls[3]?.url, "http://api.test/v1/documents/doc_1/versions");
+  assert.equal(calls[3]?.method, "GET");
+  assert.equal(calls[4]?.url, "http://api.test/v1/documents/doc_1/representations?version=1");
+});
+
+// ─── Document intake / upload ────────────────────────────────────────────────
+
+test("intake.create sends a multipart request with no content-type header set manually", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { id: "doc_1", status: "done", version: 1, bytes: 100, pages: 1, contentHash: "h", classification: "internal" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const res = await pw.intake.create({
+    file: { data: new Uint8Array([1, 2, 3]), filename: "doc.pdf", contentType: "application/pdf" },
+    classification: "internal",
+  });
+  assert.equal(res.id, "doc_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/documents/intake");
+  assert.equal(calls[0]?.method, "POST");
+  // multipart bodies never set a JSON content-type header manually
+  assert.equal(calls[0]?.headers["content-type"], undefined);
+});
+
+test("intake.sessions create/get/uploadChunk/finalize hit the right sub-paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, {
+      id: "ups_1", status: "open", filename: "doc.pdf", mediaType: "application/pdf",
+      totalBytes: 100, chunkSize: 50, totalChunks: 2, receivedChunks: [], receivedBytes: 0,
+      objectId: null, objectRole: null, classification: "internal", documentId: null,
+      errorMessage: null, isTest: false, createdByApiKeyId: null, captureBatchId: null,
+      expiresAt: "t", finalizedAt: null, createdAt: "t",
+    }),
+    json(200, { id: "ups_1", status: "open", filename: "doc.pdf", mediaType: "application/pdf", totalBytes: 100, chunkSize: 50, totalChunks: 2, receivedChunks: [0], receivedBytes: 50, objectId: null, objectRole: null, classification: "internal", documentId: null, errorMessage: null, isTest: false, createdByApiKeyId: null, captureBatchId: null, expiresAt: "t", finalizedAt: null, createdAt: "t" }),
+    json(202, { id: "doc_1", status: "done", version: 1, bytes: 100, pages: 1, contentHash: "h", classification: "internal" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const session = await pw.intake.sessions.create({
+    filename: "doc.pdf",
+    totalBytes: 100,
+    chunkSize: 50,
+  });
+  assert.equal(session.id, "ups_1");
+  await pw.intake.sessions.uploadChunk("ups_1", 0, new Uint8Array([1, 2]));
+  const result = await pw.intake.sessions.finalize("ups_1");
+  assert.equal((result as { id: string }).id, "doc_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/documents/intake/sessions");
+  assert.equal(calls[1]?.url, "http://api.test/v1/documents/intake/sessions/ups_1/chunks/0");
+  assert.equal(calls[1]?.method, "PUT");
+  assert.equal(calls[2]?.url, "http://api.test/v1/documents/intake/sessions/ups_1/finalize");
+});
+
+// ─── Fillable AcroForm templates ──────────────────────────────────────────────
+
+test("formTemplates.create uploads multipart with name/description fields", async () => {
+  const { fetch, calls } = mockFetch([
+    json(201, { id: "fmt_1", version: { version: 1, bytes: 10, pages: 1, fieldCount: 3, contentHash: "h", createdAt: "t" } }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const res = await pw.formTemplates.create({
+    name: "Claim form",
+    description: "Insurance claim",
+    file: { data: new Uint8Array([1]), filename: "claim.pdf" },
+  });
+  assert.equal(res.id, "fmt_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/form-templates");
+  assert.equal(calls[0]?.headers["content-type"], undefined);
+});
+
+test("formTemplates.fill posts the payload and version", async () => {
+  const { fetch, calls } = mockFetch([
+    json(202, { documentId: "doc_1", status: "done", version: 1, bytes: 10, pages: 1, contentHash: "h" }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const res = await pw.formTemplates.fill("fmt_1", { payload: { "claimant.fullName": "Ada" }, version: 2 });
+  assert.equal(res.documentId, "doc_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/form-templates/fmt_1/fill");
+  assert.deepEqual(calls[0]?.body, { payload: { "claimant.fullName": "Ada" }, version: 2 });
+});
+
+// ─── Error codes / workflow definitions ───────────────────────────────────────
+
+test("errorCodes.list fetches /v1/errors without the x-api-key header", async () => {
+  const { fetch, calls } = mockFetch([json(200, { domains: ["formtemplate"], codes: [] })]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  const catalog = await pw.errorCodes.list();
+  assert.deepEqual(catalog.domains, ["formtemplate"]);
+  assert.equal(calls[0]?.headers["x-api-key"], undefined);
+});
+
+test("workflowDefinitions.list / get / versions hit the right paths", async () => {
+  const { fetch, calls } = mockFetch([
+    json(200, { items: [], nextCursor: null }),
+    json(200, { id: "wfd_1", key: "onboarding", name: "Onboarding", status: "published", currentVersion: 1, hasUnpublishedChanges: false, createdAt: "t", updatedAt: "t", draftSpec: {} }),
+  ]);
+  const pw = new PageWeaver({ apiKey: "pk_test", baseUrl: "http://api.test", fetch });
+  await pw.workflowDefinitions.list();
+  await pw.workflowDefinitions.get("wfd_1");
+  assert.equal(calls[0]?.url, "http://api.test/v1/workflow-definitions");
+  assert.equal(calls[1]?.url, "http://api.test/v1/workflow-definitions/wfd_1");
+});

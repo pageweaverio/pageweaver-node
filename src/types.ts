@@ -444,6 +444,18 @@ interface CreateDocumentCommon {
   idempotencyKey?: string;
   /** HTTPS URL to receive a signed webhook POST when the document reaches a terminal state. */
   callbackUrl?: string;
+  /**
+   * A human name for the document, shown wherever it is listed. Useful when the document will gain
+   * further versions via {@link DocumentsResource.appendVersion}, so the series is recognizable rather
+   * than an id.
+   */
+  name?: string;
+  /**
+   * Mint a permanent public link for this document at `/d/{alias}`. The link always resolves to the
+   * newest version; append `@n` to pin one. Anyone holding the link can read the document — the token
+   * IS the access control: it is returned once, on the create response, and never listed again.
+   */
+  publicAlias?: boolean;
 }
 
 /** Render a published template. */
@@ -521,6 +533,13 @@ export interface CreateDocumentResult {
   /** Null for an inline render (it had no template). */
   version: number | null;
   download?: DownloadInfo;
+  /**
+   * The public capability link minted for this document, present only when `publicAlias: true` was
+   * requested. The `token` IS the access control for `/d/{alias}` (no other credential gates it), so
+   * it is returned ONLY on this response — never listed again. Reissue under the same link with
+   * {@link DocumentsResource.appendVersion}.
+   */
+  alias?: { token: string; enabled: boolean };
 }
 
 /**
@@ -891,81 +910,134 @@ export interface ProvenanceReceipt {
   signature?: ReceiptSignature;
 }
 
-// ── Living documents (F04) ────────────────────────────────────────────────────
+// ── Document lineage: trust, diff, versions, representations ───────────────────
+// Supersedes the retired `/v1/living-documents/*` surface (folded into these `/v1/documents/:id/*`
+// routes). A document created from a template can grow a version lineage via `appendVersion`; each
+// version can carry multiple artifacts ("representations": the PDF, an e-invoice XML sidecar, a JSON
+// data twin, ...).
 
-/** One immutable version of a living document. */
-export interface LivingDocumentVersionInfo {
-  seq: number;
-  /** The underlying document id — poll `documents.get(documentId)`. */
+/** `GET /v1/documents/:id/trust` — a single deterministic, agent-facing integrity + provenance summary. */
+export interface DocumentTrustManifest {
   documentId: string;
   status: DocumentStatus;
+  schemaId: string | null;
+  schemaVersion: number | null;
+  /** Null for an inline or `url` render (no template). */
+  templateId: string | null;
+  version: number | null;
+  artifactHash: string | null;
+  contentHash: string | null;
+  hashAlg: string | null;
+  chainSeq: number | null;
+  chainVerified: boolean | null;
+  signature: DocumentSignature | null;
+}
+
+/** One field-level change in a {@link DocumentDiffResult}. */
+export interface PayloadChange {
+  path: string;
+  before: unknown;
+  after: unknown;
+}
+
+/** How two documents' causal history relates, from `GET /v1/documents/:id/diff`. */
+export type DocumentDiffClassification =
+  | "payload_only"
+  | "template_only"
+  | "both_changed"
+  | "options_differ"
+  | "identical"
+  | `not_comparable_${string}`;
+
+/** `GET /v1/documents/:id/diff?against=` — a causal diff between two documents. Never renders or meters. */
+export interface DocumentDiffResult {
+  a: { documentId: string; status: DocumentStatus };
+  b: { documentId: string; status: DocumentStatus };
+  classification: DocumentDiffClassification;
+  payload: { comparable: boolean; changes: PayloadChange[] };
+  template: {
+    comparable: boolean;
+    changed: boolean;
+    templateIdA: string | null;
+    templateIdB: string | null;
+    versionA: number | null;
+    versionB: number | null;
+  };
+  optionsDelta: PayloadChange[];
+  pageDelta: number | null;
+  integrity: { contentHashA: string | null; contentHashB: string | null; identical: boolean };
+}
+
+/** Body of `POST /v1/documents/:id/versions` ({@link DocumentsResource.appendVersion}). */
+export interface AppendDocumentVersionParams {
+  /** Data merged into the SAME pinned template/schema this document's lineage started from. */
+  payload: Record<string, unknown>;
+}
+
+/** Result of `POST /v1/documents/:id/versions`: the lineage id plus the new version's queued document. */
+export interface AppendDocumentVersionResult {
+  documentId: string;
+  document: { id: string; status: DocumentStatus };
+}
+
+/** One immutable version in a document's lineage (`GET /v1/documents/:id/versions` row). */
+export interface DocumentVersionInfo {
+  /** 1-based, gap-free. */
+  seq: number;
+  /** The id to `documents.get()` this version by; null if the underlying render row was erased. */
+  documentId: string | null;
+  /** "generated" (rendered), "uploaded" (intake), or "imported". */
+  origin: string;
+  status: DocumentStatus | string;
+  reason: string | null;
   contentHash: string | null;
   chainSeq: number | null;
+  representationCount: number;
+  readyCount: number;
   /** The seq that superseded this version, or null while it is the head. */
   supersededBySeq: number | null;
-  /** ISO 8601 timestamp. */
+  createdAt: string;
+  issuedAt: string | null;
+}
+
+/** `GET /v1/documents/:id/versions` — a document's full lineage, newest first. */
+export interface DocumentVersionList {
+  documentId: string;
+  versions: DocumentVersionInfo[];
+}
+
+/** One artifact of a document version (`GET /v1/documents/:id/representations` row). */
+export interface RepresentationInfo {
+  id: string;
+  /** e.g. "pdf", "cii", "ubl", "json". */
+  format: string;
+  /** e.g. "3b" for PDF/A-3b; null when not applicable. */
+  profile: string | null;
+  role: "primary" | "sidecar" | "attachment" | "preview" | string;
+  status: string;
+  mediaType: string;
+  /** Null when this format has no page model (not the same as zero). */
+  pages: number | null;
+  bytes: number | null;
+  contentHash: string | null;
+  hashAlg: string | null;
+  chainSeq: number | null;
+  downloadProtected: boolean;
+  /** False once purged (a tombstone row past retention). */
+  contentAvailable: boolean;
+  contentExpiresAt: string | null;
+  /** A short-lived signed download URL, present only when `contentAvailable && !downloadProtected`. */
+  url?: string;
+  conformance: { standard: string; profile: string | null; status: string; validator: string | null }[];
   createdAt: string;
 }
 
-/** A living-document identity without its version list. */
-export interface LivingDocumentSummary {
-  id: string;
-  name: string | null;
-  templateId: string;
-  templateVersion: number;
-  /** The public alias token, or null when none has been published. */
-  alias: string | null;
-  aliasEnabled: boolean;
-  /** The current head version's seq, or null until the first render completes. */
-  latestVersion: number | null;
-  /** ISO 8601 timestamps. */
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** A living document with its full version history. */
-export interface LivingDocumentDetail extends LivingDocumentSummary {
-  versions: LivingDocumentVersionInfo[];
-}
-
-/** Parameters for `livingDocuments.create`. */
-export interface CreateLivingDocumentParams {
-  templateId: string;
-  /** Pin a specific published version to freeze; defaults to the template's current version. */
-  version?: number;
-  payload: Record<string, unknown>;
-  name?: string;
-  /** Publish a public `/d/:alias` link (requires the publicAlias plan capability). */
-  publicAlias?: boolean;
-}
-
-/** Parameters for `livingDocuments.reissue`. */
-export interface ReissueLivingDocumentParams {
-  payload: Record<string, unknown>;
-}
-
-/** Result of creating a living document: the identity plus the first version's queued document. */
-export interface CreateLivingDocumentResult {
-  livingDocument: LivingDocumentSummary;
-  document: { id: string; status: DocumentStatus };
-}
-
-/** Result of reissuing a living document: the identity id plus the new version's queued document. */
-export interface ReissueLivingDocumentResult {
-  id: string;
-  document: { id: string; status: DocumentStatus };
-}
-
-/** One page of the living-document list. */
-export interface LivingDocumentPage {
-  items: LivingDocumentSummary[];
-  nextCursor: string | null;
-}
-
-/** Parameters for `livingDocuments.list`. */
-export interface ListLivingDocumentsParams {
-  cursor?: string;
-  limit?: number;
+/** `GET /v1/documents/:id/representations` — every artifact of one document version. */
+export interface RepresentationList {
+  documentId: string;
+  /** Null if no version has been issued yet. */
+  documentVersion: number | null;
+  representations: RepresentationInfo[];
 }
 
 /** The frozen editor source of a template version (returned by `version(id, n, { include: "source" })`). */
@@ -1895,4 +1967,718 @@ export interface Submission {
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── Generic cursor page ──────────────────────────────────────────────────────
+
+/** The generic cursor-paginated shape used by every object-model / meta list endpoint. */
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+// ── Object types (typed business-record definitions) — requires `objects:read` / `object-types:manage` ──
+
+export type ObjectTypeStatus = "draft" | "published" | "deprecated";
+
+/** Per-role visibility narrowing for a whole object type; each list narrows an implicit "everyone" default. */
+export interface ObjectTypeAccessPolicy {
+  view?: string[];
+  write?: string[];
+  viewSensitive?: string[];
+  apiAccess?: boolean;
+}
+
+/**
+ * A dotted-path field policy overlay, e.g. `{ "customer.ssn": { sensitive: true } }`. Mirrors the
+ * `x-pw-*` JSON Schema annotation vocabulary: `sensitive`, `title`, `listable`, `searchable`,
+ * `classification`, `permission`, `immutable`.
+ */
+export interface FieldPolicyOverlay {
+  sensitive?: boolean;
+  title?: string;
+  listable?: boolean;
+  searchable?: boolean;
+  classification?: "public" | "internal" | "confidential" | "restricted";
+  permission?: string;
+  immutable?: boolean;
+}
+
+/** `GET /v1/object-types` row. */
+export interface ObjectTypeView {
+  id: string;
+  key: string;
+  nameSingular: string;
+  namePlural: string;
+  description: string | null;
+  status: ObjectTypeStatus;
+  currentVersion: number;
+  hasUnpublishedChanges: boolean;
+  accessPolicy: ObjectTypeAccessPolicy | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `GET /v1/object-types/:id` — the view plus the DRAFT artifact (unpublished working copy). */
+export interface ObjectTypeDetailView extends ObjectTypeView {
+  schema: unknown;
+  uiSchema: unknown;
+  policyOverlay: unknown;
+  lifecycle: unknown;
+  search: unknown;
+}
+
+/** Body of `POST /v1/object-types` and `PATCH /v1/object-types/:id` (all fields optional on update). */
+export interface ObjectTypeDraftParams {
+  /** `POST` only, immutable after create: `/^[a-z][a-z0-9_]{0,62}$/`. */
+  key?: string;
+  nameSingular?: string;
+  namePlural?: string;
+  description?: string;
+  /** JSON Schema, optionally annotated with `x-pw-*` field policy hints. */
+  schema?: Record<string, unknown>;
+  /** Presentation only; excluded from the published snapshot hash. */
+  uiSchema?: Record<string, unknown>;
+  policyOverlay?: Record<string, FieldPolicyOverlay>;
+  lifecycle?: Record<string, unknown>;
+  search?: Record<string, unknown>;
+  accessPolicy?: ObjectTypeAccessPolicy;
+}
+
+/** `POST /v1/object-types` body — `key`/`nameSingular`/`namePlural` are required on create. */
+export interface CreateObjectTypeParams extends ObjectTypeDraftParams {
+  key: string;
+  nameSingular: string;
+  namePlural: string;
+}
+
+export interface ObjectTypeVersionSummary {
+  id: string;
+  version: number;
+  snapshotHash: string;
+  nameSingular: string;
+  namePlural: string;
+  description: string | null;
+  note: string | null;
+  derivedFromVersion: number | null;
+  publishedByUserId: string | null;
+  publishedAt: string;
+  isCurrent: boolean;
+}
+
+export interface CompiledFieldPolicies {
+  fields: Record<string, FieldPolicyOverlay>;
+  sensitivePaths: string[];
+}
+
+export interface ObjectTypeVersionDetail extends ObjectTypeVersionSummary {
+  schema: unknown;
+  uiSchema: unknown;
+  fieldPolicies: CompiledFieldPolicies;
+  lifecycle: unknown;
+  search: unknown;
+}
+
+/** Body of `POST /v1/object-types/:id/publish`. */
+export interface PublishObjectTypeParams {
+  note?: string;
+}
+
+/** `POST /v1/object-types/:id/publish` result. `unchanged: true` means the draft matched the current version (no new version minted). */
+export interface PublishedObjectTypeView {
+  objectTypeId: string;
+  version: number;
+  snapshotHash: string;
+  unchanged: boolean;
+  policies: CompiledFieldPolicies;
+}
+
+/** Body of `POST /v1/object-types/:id/deprecate`. */
+export interface DeprecateObjectTypeParams {
+  reason: string;
+}
+
+/** Query params for `GET /v1/object-types` and the paginated versions/objects/relationship-types lists. */
+export interface CursorListParams {
+  cursor?: string;
+  /** 1 to 100, default 25. */
+  limit?: number;
+}
+
+export interface ListObjectTypesParams extends CursorListParams {
+  status?: ObjectTypeStatus;
+}
+
+// ── Objects (typed business records) — requires `objects:read` / `objects:write` / `relationships:manage` ──
+
+export type BusinessObjectStatus = "active" | "archived";
+export type ObjectClassification = "public" | "internal" | "confidential" | "restricted";
+
+/** `GET /v1/objects` row — never carries field data (fetch `objects.get(id)` for that). */
+export interface BusinessObjectView {
+  id: string;
+  objectTypeId: string;
+  number: string;
+  title: string | null;
+  lifecycleState: string | null;
+  status: BusinessObjectStatus;
+  classification: ObjectClassification;
+  ownerUserId: string | null;
+  version: number;
+  dataHash: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** `GET /v1/objects/:id` — the view plus its field data. */
+export interface BusinessObjectValueView extends BusinessObjectView {
+  data: unknown;
+  /** Sensitive field paths this type declares that were withheld from `data` (reflects the TYPE's policy, not this record). */
+  withheldPaths: string[];
+  /** Whether `includeSensitive` was honored (requires `objects:read-sensitive`). */
+  sensitiveIncluded: boolean;
+  /** True when sensitive data was requested but is unavailable (e.g. decryption failure), not merely withheld. */
+  sensitiveUnavailable: boolean;
+}
+
+/** Query params for `GET /v1/objects`. */
+export interface ListObjectsParams extends CursorListParams {
+  objectTypeKey?: string;
+  objectTypeId?: string;
+  status?: BusinessObjectStatus;
+  lifecycleState?: string;
+  ownerUserId?: string;
+  number?: string;
+}
+
+/**
+ * Body of `POST /v1/objects`. Provide exactly one of `objectTypeKey`/`objectTypeId`. `idempotencyKey`
+ * is sent as the `Idempotency-Key` header when provided (the header wins if you also set one directly
+ * via a signal-less call); an exact repeat returns the original record, the same key with a different
+ * body is a 409.
+ */
+export interface CreateObjectParams {
+  objectTypeKey?: string;
+  objectTypeId?: string;
+  data: Record<string, unknown>;
+  /** Caller-supplied import number. Does not advance the account's generated sequence. */
+  number?: string;
+  lifecycleState?: string;
+  ownerUserId?: string;
+  /** May only tighten relative to the type's default. */
+  classification?: ObjectClassification;
+  changeReason?: string;
+  source?: string;
+  idempotencyKey?: string;
+}
+
+/**
+ * Body of `PUT /v1/objects/:id`. Exactly one of `expectedVersion` or an `If-Match` header (sent
+ * automatically when you pass `expectedVersion` — see {@link ObjectsResource.replace}) is required by
+ * the API; a mismatch is a 409, never a silent overwrite. `data` REPLACES the record whole, it is not
+ * merged.
+ */
+export interface ReplaceObjectParams {
+  data: Record<string, unknown>;
+  expectedVersion: number;
+  lifecycleState?: string;
+  ownerUserId?: string;
+  classification?: ObjectClassification;
+  changeReason?: string;
+  source?: string;
+}
+
+/** `GET /v1/objects/:id/versions` row — never carries values (read one via `objects.get(id, { version })`). */
+export interface BusinessObjectVersionSummary {
+  id: string;
+  version: number;
+  objectTypeVersion: number;
+  dataHash: string;
+  title: string | null;
+  lifecycleState: string | null;
+  changeReason: string | null;
+  actorType: string;
+  actorId: string;
+  source: string | null;
+  hasSensitiveData: boolean;
+  createdAt: string;
+}
+
+/** Body of `POST /v1/objects/:id/archive`. */
+export interface ArchiveObjectParams {
+  reason: string;
+}
+
+export type RelationshipCardinality = "one_to_one" | "one_to_many" | "many_to_one" | "many_to_many";
+export type RelationshipTypeStatus = "active" | "deprecated";
+
+/** `GET /v1/relationship-types` row. */
+export interface RelationshipTypeView {
+  id: string;
+  key: string;
+  label: string;
+  inverseLabel: string;
+  description: string | null;
+  sourceTypeKeys: string[];
+  targetTypeKeys: string[];
+  cardinality: RelationshipCardinality;
+  status: RelationshipTypeStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Body of `POST /v1/relationship-types`. */
+export interface CreateRelationshipTypeParams {
+  /** `/^[a-z][a-z0-9_]{0,62}$/`. */
+  key: string;
+  /** Source → target reading, e.g. "invoices". */
+  label: string;
+  /** Target → source reading, e.g. "invoiced by". */
+  inverseLabel: string;
+  description?: string;
+  /** Object-type keys allowed at the source end. Empty/omitted means any type. */
+  sourceTypeKeys?: string[];
+  /** Object-type keys allowed at the target end. Empty/omitted means any type. */
+  targetTypeKeys?: string[];
+  /** Default `"many_to_many"`. */
+  cardinality?: RelationshipCardinality;
+  /** JSON Schema each edge's `metadata` is validated against. */
+  metadataSchema?: Record<string, unknown>;
+}
+
+/** Body of `PATCH /v1/relationship-types/:id`. Changes govern only edges created after the update. */
+export interface UpdateRelationshipTypeParams {
+  label?: string;
+  inverseLabel?: string;
+  description?: string;
+  sourceTypeKeys?: string[];
+  targetTypeKeys?: string[];
+  cardinality?: RelationshipCardinality;
+  metadataSchema?: Record<string, unknown>;
+}
+
+/** Body of `POST /v1/relationship-types/:id/deprecate`. */
+export interface DeprecateRelationshipTypeParams {
+  reason: string;
+}
+
+/** `GET /v1/objects/:id/relationships` row — one edge, from either end. */
+export interface ObjectRelationshipEdge {
+  id: string;
+  relationshipTypeId: string;
+  relationshipTypeKey: string;
+  label: string;
+  inverseLabel: string;
+  sourceObjectId: string;
+  targetObjectId: string;
+  metadata: unknown;
+  validFrom: string;
+  validTo: string | null;
+  endReason: string | null;
+  direction: "outgoing" | "incoming";
+  relatedObjectId: string;
+}
+
+/** Body of `POST /v1/objects/:id/relationships` — `:id` is the source; provide one of the type fields. */
+export interface CreateRelationshipParams {
+  relationshipTypeKey?: string;
+  relationshipTypeId?: string;
+  targetObjectId: string;
+  /** Validated against the relationship type's `metadataSchema` when declared. */
+  metadata?: Record<string, unknown>;
+}
+
+/** `POST /v1/objects/:id/relationships` result. `unchanged: true` means an identical live edge already existed. */
+export interface RelationshipView {
+  id: string;
+  relationshipTypeId: string;
+  relationshipTypeKey: string;
+  label: string;
+  inverseLabel: string;
+  sourceObjectId: string;
+  targetObjectId: string;
+  metadata: unknown;
+  validFrom: string;
+  validTo: string | null;
+  endReason: string | null;
+  unchanged: boolean;
+}
+
+/** Body of `POST /v1/objects/:id/relationships/:relationshipId/end`. The row stays; nothing is deleted. */
+export interface EndRelationshipParams {
+  reason?: string;
+}
+
+export type DocumentObjectLinkRole =
+  | "primary"
+  | "supporting"
+  | "evidence"
+  | "generated_for"
+  | "correspondence";
+
+/** `GET /v1/objects/:id/documents` row. */
+export interface DocumentObjectLinkView {
+  id: string;
+  documentId: string;
+  businessObjectId: string;
+  role: DocumentObjectLinkRole | string;
+  createdAt: string;
+  unchanged: boolean;
+}
+
+/** Body of `POST /v1/objects/:id/documents`. Idempotent per `(document, object, role)`. */
+export interface LinkDocumentParams {
+  /** A document id from `documents.create`. */
+  documentId: string;
+  /** Default `"primary"`. */
+  role?: DocumentObjectLinkRole;
+}
+
+/** Result of `DELETE /v1/objects/:id/documents/:documentId`. Idempotent: unlinking an absent link succeeds with `removed: false`. */
+export interface UnlinkDocumentResult {
+  removed: boolean;
+}
+
+// ── Search — requires `search:read` (object hits additionally require `objects:read`) ──────────
+
+export type SearchSubjectType = "object" | "document";
+
+/** Query params for `GET /v1/search`. */
+export interface SearchParams {
+  /** Required, non-empty. Websearch syntax: quote a phrase, `-exclude`, `OR`. */
+  q: string;
+  subjectType?: SearchSubjectType;
+  objectTypeKey?: string;
+  classification?: ObjectClassification;
+  ownerUserId?: string;
+  updatedAfter?: string;
+  updatedBefore?: string;
+  cursor?: string;
+  /** 1 to 100, default 25. */
+  limit?: number;
+}
+
+/**
+ * One hit. `subjectType` is the primary discriminator; `objectTypeKey` is set only on object hits and
+ * `documentFormat` only on document hits (mutually exclusive).
+ */
+export interface SearchResultItem {
+  subjectType: SearchSubjectType;
+  subjectId: string;
+  title: string | null;
+  /** Excerpt built only from non-sensitive fields/extracted text. */
+  snippet: string;
+  classification: string;
+  objectTypeKey: string | null;
+  documentFormat: string | null;
+  state: string | null;
+  updatedAt: string;
+}
+
+/** `GET /v1/search` result. A hit the caller may not view is silently dropped, not surfaced as a 403. */
+export interface SearchAccountPage {
+  items: SearchResultItem[];
+  nextCursor: string | null;
+}
+
+// ── Workflow definitions (read-only) — requires `workflows:read` ────────────────────────────────
+
+export type WorkflowDefinitionStatus = "draft" | "published" | "deprecated";
+
+export interface WorkflowDefinitionView {
+  id: string;
+  key: string;
+  name: string;
+  status: WorkflowDefinitionStatus;
+  currentVersion: number;
+  hasUnpublishedChanges: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The stage graph / transitions / task templates a workflow definition compiles to. Structure is server-defined. */
+export type WorkflowDefinitionSpec = Record<string, unknown>;
+
+export interface WorkflowDefinitionDetailView extends WorkflowDefinitionView {
+  draftSpec: WorkflowDefinitionSpec;
+}
+
+export interface WorkflowDefinitionVersionSummary {
+  id: string;
+  version: number;
+  snapshotHash: string;
+  name: string;
+  note: string | null;
+  publishedByUserId: string | null;
+  publishedAt: string;
+  isCurrent: boolean;
+}
+
+export interface WorkflowDefinitionVersionDetail extends WorkflowDefinitionVersionSummary {
+  spec: WorkflowDefinitionSpec;
+}
+
+export interface ListWorkflowDefinitionsParams extends CursorListParams {
+  status?: WorkflowDefinitionStatus;
+}
+
+// ── Fillable AcroForm templates — requires `documents:upload` (upload) / `render` (fill) ────────
+// Not the same surface as `forms.*` (Smart Forms, a Liquid template + JSON Schema). This fills an
+// uploaded PDF's own AcroForm fields.
+
+/** A binary payload for a multipart upload: a `Blob`/`File` in browsers, or a `Buffer`/`Uint8Array`+filename in Node. */
+export type UploadableFile =
+  | Blob
+  | { data: Uint8Array | ArrayBuffer; filename: string; contentType?: string };
+
+export interface FormTemplateVersionSummary {
+  version: number;
+  bytes: number;
+  pages: number;
+  fieldCount: number;
+  contentHash: string;
+  createdAt: string;
+}
+
+export interface FormTemplateSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A JSON-Schema-shaped node describing one derived AcroForm field contract. Structure is server-defined. */
+export type JsonSchemaNode = Record<string, unknown>;
+
+export interface FormTemplateDetail extends FormTemplateSummary {
+  /** The current version's derived field-schema contract, or null if it could not be derived. */
+  fieldSchema: JsonSchemaNode | null;
+}
+
+/** Fields for `POST /v1/form-templates` (multipart; pass the PDF bytes as `file`). */
+export interface CreateFormTemplateParams {
+  name: string;
+  description?: string;
+  file: UploadableFile;
+}
+
+/** `POST /v1/form-templates` / `POST /v1/form-templates/:id/versions` result. */
+export interface FormTemplateUploadResult {
+  id: string;
+  version: FormTemplateVersionSummary;
+}
+
+/** Body of `POST /v1/form-templates/:id/fill`. */
+export interface FillFormTemplateParams {
+  /** Keyed by the AcroForm's dotted field name, e.g. `"claimant.fullName"`. */
+  payload: Record<string, unknown>;
+  /** Defaults to the template's current version. */
+  version?: number;
+}
+
+/** `POST /v1/form-templates/:id/fill` result — stored as an ordinary document (hash chain, retention, delivery all inherited). */
+export interface FillResultView {
+  documentId: string;
+  status: "done";
+  version: number;
+  bytes: number;
+  pages: number;
+  contentHash: string;
+}
+
+// ── Document intake / upload (first-class document ingestion) — requires `documents:upload` ────
+// Distinct from rendering: this ingests a PDF you already have (not a template render).
+
+export interface IntakeResultView {
+  id: string;
+  status: "done";
+  version: number;
+  bytes: number;
+  pages: number;
+  contentHash: string;
+  classification: ObjectClassification;
+}
+
+/** Fields for `POST /v1/documents/intake` (multipart; pass the PDF bytes as `file`). Synchronous, single file, PDF only. */
+export interface IntakeDocumentParams {
+  file: UploadableFile;
+  objectId?: string;
+  /** Default `"evidence"`. */
+  objectRole?: DocumentObjectLinkRole;
+  /** Default `"internal"`. */
+  classification?: ObjectClassification;
+}
+
+export type UploadSessionStatus = "open" | "assembling" | "done" | "failed" | "abandoned" | string;
+
+export interface UploadSessionView {
+  id: string;
+  status: UploadSessionStatus;
+  filename: string;
+  mediaType: string;
+  totalBytes: number;
+  chunkSize: number;
+  totalChunks: number;
+  /** 0-based chunk indexes received so far. */
+  receivedChunks: number[];
+  receivedBytes: number;
+  objectId: string | null;
+  objectRole: string | null;
+  classification: string | null;
+  documentId: string | null;
+  errorMessage: string | null;
+  isTest: boolean;
+  createdByApiKeyId: string | null;
+  captureBatchId: string | null;
+  /** Sessions expire 24h after creation. */
+  expiresAt: string;
+  finalizedAt: string | null;
+  createdAt: string;
+}
+
+/** Body of `POST /v1/documents/intake/sessions`. `chunkSize` is capped at 10 MiB per chunk by the API. */
+export interface CreateUploadSessionParams {
+  filename: string;
+  mediaType?: string;
+  totalBytes: number;
+  chunkSize: number;
+  objectId?: string;
+  /** Default `"evidence"` when `objectId` is set. */
+  objectRole?: DocumentObjectLinkRole;
+  /** Default `"internal"`, staged and applied at finalize. */
+  classification?: ObjectClassification;
+}
+
+/** One file within a `POST /v1/documents/intake/sessions/batch` request. */
+export interface BulkUploadFileParams {
+  filename: string;
+  mediaType?: string;
+  totalBytes: number;
+  chunkSize: number;
+}
+
+/** Body of `POST /v1/documents/intake/sessions/batch` — start up to 200 resumable sessions at once. */
+export interface CreateUploadSessionBatchParams {
+  name?: string;
+  files: BulkUploadFileParams[];
+  objectId?: string;
+  objectRole?: DocumentObjectLinkRole;
+  classification?: ObjectClassification;
+}
+
+export interface CaptureBatchView {
+  id: string;
+  status: string;
+  name: string | null;
+  captureSourceId: string | null;
+  captureProfileId: string | null;
+  ingestionCampaignId: string | null;
+  totalItems: number;
+  discoveredItems: number;
+  acceptedItems: number;
+  duplicateItems: number;
+  rejectedItems: number;
+  errorItems: number;
+  errorMessage: string | null;
+  isTest: boolean;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+/** One file's outcome within a batch-session create — success and failure are reported per file, not for the whole call. */
+export type CreateUploadSessionBatchFileResult =
+  | { ok: true; session: UploadSessionView }
+  | { ok: false; filename: string; error: string };
+
+export interface CreateUploadSessionBatchResult {
+  batch: CaptureBatchView;
+  sessions: CreateUploadSessionBatchFileResult[];
+}
+
+/** `POST /v1/documents/intake/sessions/:id/finalize` — a single-file/PDF session finalizes to this. */
+export type IntakeFinalizeResult = IntakeResultView | IntakeArchiveResultView;
+
+/** One member's outcome inside a finalized ZIP intake session. */
+export interface ArchiveMemberResultView {
+  path: string;
+  ok: boolean;
+  documentId?: string;
+  bytes?: number;
+  pages?: number;
+  contentHash?: string;
+  error?: string;
+}
+
+/** `POST /v1/documents/intake/sessions/:id/finalize` — a ZIP session expands into many documents. */
+export interface IntakeArchiveResultView {
+  status: "expanded";
+  captureBatchId: string;
+  accepted: number;
+  duplicate: number;
+  rejected: number;
+  error: number;
+  members: ArchiveMemberResultView[];
+}
+
+// ── Error registry (public, unauthenticated) ─────────────────────────────────────────────────────
+
+/** `GET /v1/errors` row — one coded API failure, with the HTTP status it always answers with. */
+export interface ErrorCatalogEntry {
+  /** Dot-namespaced, e.g. `"formtemplate.malware_detected"`. */
+  code: string;
+  status: number;
+  summary: string;
+  cause: string;
+  resolution: string;
+  retryability: string;
+  /** True for a deliberate refusal (e.g. a TSA outage, an SSRF block, a schematron reject). */
+  failClosed?: boolean;
+}
+
+/** `GET /v1/errors` — the full public error-code catalog, for building typed handling around `PageWeaverApiError.code`. */
+export interface ErrorCatalogResponse {
+  domains: readonly string[];
+  codes: readonly ErrorCatalogEntry[];
+}
+
+// ── Domain events (append-only ledger) — requires `read` (baseline) ─────────────────────────────
+
+/** Query params for `GET /v1/events`. */
+export interface ListEventsParams {
+  /** Resume point: the seq (as a string) last processed. Exclusive. */
+  after?: string;
+  /** 1 to 200, default 50. */
+  limit?: number;
+  type?: string;
+  subjectType?: string;
+  subjectId?: string;
+  correlationId?: string;
+}
+
+/** One row of the append-only domain-event ledger. `payload` never carries request bodies, field values, or recipient addresses. */
+export interface DomainEventView {
+  id: string;
+  /** A BigInt, serialized as a string to avoid precision loss past 2^53. */
+  seq: string;
+  type: string;
+  version: number;
+  subjectType: string | null;
+  subjectId: string | null;
+  payload: unknown;
+  correlationId: string | null;
+  /** ISO 8601 timestamp. */
+  at: string;
+}
+
+/** `GET /v1/events` result. Entries are filtered to what the key's scopes can see; hidden ones are silently dropped. */
+export interface DomainEventPage {
+  events: DomainEventView[];
+  /** The last seq this query READ (not necessarily returned) — resume from here even if trailing events were scope-trimmed. */
+  nextCursor: string | null;
+  /** The account's newest position, regardless of this reader's visibility. */
+  latestSeq: string;
 }

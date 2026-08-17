@@ -1,20 +1,28 @@
 import type { HttpClient } from "./http";
 import { PageWeaverDocumentFailedError, PageWeaverTimeoutError } from "./errors";
+import { requireId, requireObjectBody, requirePositiveInt } from "./validation";
 import type {
+  AppendDocumentVersionParams,
+  AppendDocumentVersionResult,
   CommentMigrationRollup,
   CreateDocumentParams,
   CreateDocumentResult,
   CreateSyncResult,
   Document,
+  DocumentDiffResult,
   DocumentPage,
   DocumentPageInfo,
   DocumentStatus,
+  DocumentTrustManifest,
   DocumentVerification,
   DocumentAccessibility,
+  DocumentVersionInfo,
+  DocumentVersionList,
   ProvenanceReceipt,
   ListDocumentsParams,
   MigrateCommentsParams,
   MigrateCommentsResult,
+  RepresentationList,
   ValidateDocumentParams,
   ValidateDocumentResult,
 } from "./types";
@@ -63,6 +71,7 @@ export class DocumentsResource {
    * {@link waitFor}, or use {@link createAndWait} to block until it is ready.
    */
   create(params: CreateDocumentParams, signal?: AbortSignal): Promise<CreateDocumentResult> {
+    requireObjectBody(params, "params");
     const { idempotencyKey, ...rest } = params;
     const headers = idempotencyKey ? { "idempotency-key": idempotencyKey } : undefined;
     return this.http.json<CreateDocumentResult>("POST", "/v1/documents", {
@@ -83,6 +92,7 @@ export class DocumentsResource {
     params: ValidateDocumentParams,
     signal?: AbortSignal,
   ): Promise<ValidateDocumentResult> {
+    requireObjectBody(params, "params");
     return this.http.json<ValidateDocumentResult>("POST", "/v1/documents/validate", {
       body: params,
       signal,
@@ -91,7 +101,38 @@ export class DocumentsResource {
 
   /** Fetch the current state of a document. When `status` is "done" it carries a `download` block. */
   get(id: string, signal?: AbortSignal): Promise<Document> {
+    requireId(id, "id");
     return this.http.json<Document>("GET", `/v1/documents/${encodeURIComponent(id)}`, { signal });
+  }
+
+  /**
+   * A deterministic, agent-facing trust manifest for one call: the schema/template pin, the compiled
+   * artifact hash, the content hash + hash-chain position, and the signature status, in a single shape
+   * meant to be read (or diffed) programmatically rather than assembled from {@link get}/{@link verify}.
+   */
+  trust(id: string, signal?: AbortSignal): Promise<DocumentTrustManifest> {
+    requireId(id, "id");
+    return this.http.json<DocumentTrustManifest>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/trust`,
+      { signal },
+    );
+  }
+
+  /**
+   * A causal diff between this document and `against`: whether the payload, the pinned template
+   * version, or the per-render options changed, plus a page-count delta and whether the two content
+   * hashes are identical. Never renders or meters. Returns a `not_comparable_*` classification (not an
+   * error) when the two documents don't share a common template lineage.
+   */
+  diff(id: string, against: string, signal?: AbortSignal): Promise<DocumentDiffResult> {
+    requireId(id, "id");
+    requireId(against, "against");
+    return this.http.json<DocumentDiffResult>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/diff`,
+      { query: { against }, signal },
+    );
   }
 
   /**
@@ -100,6 +141,7 @@ export class DocumentsResource {
    * yourself — no API call is required for that.
    */
   verify(id: string, signal?: AbortSignal): Promise<DocumentVerification> {
+    requireId(id, "id");
     return this.http.json<DocumentVerification>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/verify`,
@@ -115,6 +157,7 @@ export class DocumentsResource {
    * one, or whose report has passed its retention window.
    */
   accessibility(id: string, signal?: AbortSignal): Promise<DocumentAccessibility> {
+    requireId(id, "id");
     return this.http.json<DocumentAccessibility>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/accessibility`,
@@ -129,6 +172,7 @@ export class DocumentsResource {
    * the published key. Requires a plan with the provenance-receipt capability.
    */
   receipt(id: string, signal?: AbortSignal): Promise<ProvenanceReceipt> {
+    requireId(id, "id");
     return this.http.json<ProvenanceReceipt>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/receipt`,
@@ -144,6 +188,7 @@ export class DocumentsResource {
    * Requires a plan with the proof-pack capability; a completed, not-yet-purged document only.
    */
   proofPack(id: string, signal?: AbortSignal): Promise<Uint8Array> {
+    requireId(id, "id");
     return this.http.bytes("GET", `/v1/documents/${encodeURIComponent(id)}/proof`, {
       headers: { accept: "application/zip" },
       signal,
@@ -199,10 +244,68 @@ export class DocumentsResource {
     id: string,
     opts: { mode?: "exact" | "current"; signal?: AbortSignal } = {},
   ): Promise<CreateDocumentResult> {
+    requireId(id, "id");
     return this.http.json<CreateDocumentResult>(
       "POST",
       `/v1/documents/${encodeURIComponent(id)}/regenerate`,
       { body: opts.mode ? { mode: opts.mode } : {}, signal: opts.signal },
+    );
+  }
+
+  /**
+   * Issue a new version under this document's lineage (append, not replace): validates `payload`
+   * against the pinned template/schema, renders it as a new document, and fires a `document.superseded`
+   * webhook on the prior head. Only valid for a template-pinned document (an inline or `url` render has
+   * no lineage to append to — use {@link regenerate} instead). Requires a plan with document versioning.
+   */
+  appendVersion(
+    id: string,
+    params: AppendDocumentVersionParams,
+    signal?: AbortSignal,
+  ): Promise<AppendDocumentVersionResult> {
+    requireId(id, "id");
+    requireObjectBody(params, "params");
+    return this.http.json<AppendDocumentVersionResult>(
+      "POST",
+      `/v1/documents/${encodeURIComponent(id)}/versions`,
+      { body: params, signal },
+    );
+  }
+
+  /** List this document's own version sequence (newest first): the lineage {@link appendVersion} builds. */
+  versions(id: string, signal?: AbortSignal): Promise<DocumentVersionList> {
+    requireId(id, "id");
+    return this.http.json<DocumentVersionList>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/versions`,
+      { signal },
+    );
+  }
+
+  /** Fetch one immutable pinned version (by 1-based `seq`) from this document's lineage. */
+  version(id: string, seq: number, signal?: AbortSignal): Promise<DocumentVersionInfo> {
+    requireId(id, "id");
+    requirePositiveInt(seq, "seq");
+    return this.http.json<DocumentVersionInfo>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/versions/${encodeURIComponent(seq)}`,
+      { signal },
+    );
+  }
+
+  /**
+   * List every artifact (PDF, e-invoice XML sidecar, JSON data twin, ...) produced for one version of
+   * this document. Defaults to the version `id` names; pass `version` to inspect an older one.
+   */
+  representations(
+    id: string,
+    opts: { version?: number; signal?: AbortSignal } = {},
+  ): Promise<RepresentationList> {
+    requireId(id, "id");
+    return this.http.json<RepresentationList>(
+      "GET",
+      `/v1/documents/${encodeURIComponent(id)}/representations`,
+      { query: { version: opts.version }, signal: opts.signal },
     );
   }
 
@@ -301,6 +404,7 @@ export class DocumentsResource {
    * exist — enough to place comment anchors without rendering the PDF yourself.
    */
   pages(id: string, signal?: AbortSignal): Promise<DocumentPageInfo[]> {
+    requireId(id, "id");
     return this.http.json<DocumentPageInfo[]>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/pages`,
@@ -318,6 +422,7 @@ export class DocumentsResource {
     params: MigrateCommentsParams,
     signal?: AbortSignal,
   ): Promise<MigrateCommentsResult> {
+    requireId(id, "id");
     return this.http.json<MigrateCommentsResult>(
       "POST",
       `/v1/documents/${encodeURIComponent(id)}/migrate-comments`,
@@ -327,6 +432,7 @@ export class DocumentsResource {
 
   /** The comment-migration rollup for a document, grouped by migration status. */
   commentMigration(id: string, signal?: AbortSignal): Promise<CommentMigrationRollup> {
+    requireId(id, "id");
     return this.http.json<CommentMigrationRollup>(
       "GET",
       `/v1/documents/${encodeURIComponent(id)}/comment-migration`,
@@ -339,6 +445,7 @@ export class DocumentsResource {
    * unprotected document, the short-lived signed URL is resolved and fetched automatically.
    */
   async download(id: string, opts: DownloadOptions = {}): Promise<Uint8Array> {
+    requireId(id, "id");
     if (opts.password !== undefined) {
       return this.http.bytes("GET", `/v1/documents/${encodeURIComponent(id)}/content`, {
         headers: { "x-document-password": opts.password },

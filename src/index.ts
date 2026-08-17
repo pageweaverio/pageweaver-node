@@ -2,7 +2,7 @@
 // Server-side (Node 18+): uses the global `fetch` and `node:crypto` for webhook verification.
 
 export { PageWeaver, type PageWeaverOptions } from "./client";
-export type { FetchLike } from "./http";
+export type { FetchLike, RetryOptions } from "./http";
 
 export {
   DocumentsResource,
@@ -19,16 +19,34 @@ export { ReviewsResource } from "./reviews";
 export { ShareLinksResource } from "./shareLinks";
 export { EnvironmentsResource } from "./environments";
 export { DeploymentsResource } from "./deployments";
-export { LivingDocumentsResource } from "./livingDocuments";
 export { FormsResource } from "./forms";
 export { SubmissionsResource } from "./submissions";
+export { ObjectTypesResource } from "./objectTypes";
+export { ObjectsResource } from "./objects";
+export { RelationshipTypesResource } from "./relationshipTypes";
+export { SearchResource } from "./search";
+export { WorkflowDefinitionsResource } from "./workflowDefinitions";
+export { FormTemplatesResource } from "./formTemplates";
+export { IntakeResource, IntakeSessionsResource } from "./intake";
+export { ErrorCodesResource } from "./errorCodes";
+export { EventsResource } from "./events";
 
 export {
   PageWeaverError,
   PageWeaverApiError,
+  PageWeaverAuthenticationError,
+  PageWeaverPermissionError,
+  PageWeaverNotFoundError,
+  PageWeaverConflictError,
+  PageWeaverValidationError,
+  PageWeaverPlanRequiredError,
+  PageWeaverRateLimitError,
+  PageWeaverServerError,
   PageWeaverConnectionError,
+  PageWeaverInvalidRequestError,
   PageWeaverTimeoutError,
   PageWeaverDocumentFailedError,
+  type ApiErrorArgs,
 } from "./errors";
 
 export {
@@ -95,16 +113,17 @@ export type {
   ProvenanceReceipt,
   ReceiptIdentity,
   ReceiptSignature,
-  // Living documents (F04)
-  LivingDocumentSummary,
-  LivingDocumentDetail,
-  LivingDocumentVersionInfo,
-  CreateLivingDocumentParams,
-  CreateLivingDocumentResult,
-  ReissueLivingDocumentParams,
-  ReissueLivingDocumentResult,
-  LivingDocumentPage,
-  ListLivingDocumentsParams,
+  // Document lineage: trust, diff, versions, representations
+  DocumentTrustManifest,
+  PayloadChange,
+  DocumentDiffClassification,
+  DocumentDiffResult,
+  AppendDocumentVersionParams,
+  AppendDocumentVersionResult,
+  DocumentVersionInfo,
+  DocumentVersionList,
+  RepresentationInfo,
+  RepresentationList,
   SchemaSummary,
   Schema,
   SchemaVersionSummary,
@@ -203,4 +222,90 @@ export type {
   ValidateFormResult,
   CreateSubmissionResult,
   Submission,
+  // Generic cursor page
+  CursorPage,
+  CursorListParams,
+  // Object types
+  ObjectTypeStatus,
+  ObjectTypeAccessPolicy,
+  FieldPolicyOverlay,
+  ObjectTypeView,
+  ObjectTypeDetailView,
+  ObjectTypeDraftParams,
+  CreateObjectTypeParams,
+  ObjectTypeVersionSummary,
+  CompiledFieldPolicies,
+  ObjectTypeVersionDetail,
+  PublishObjectTypeParams,
+  PublishedObjectTypeView,
+  DeprecateObjectTypeParams,
+  ListObjectTypesParams,
+  // Objects
+  BusinessObjectStatus,
+  ObjectClassification,
+  BusinessObjectView,
+  BusinessObjectValueView,
+  ListObjectsParams,
+  CreateObjectParams,
+  ReplaceObjectParams,
+  BusinessObjectVersionSummary,
+  ArchiveObjectParams,
+  RelationshipCardinality,
+  RelationshipTypeStatus,
+  RelationshipTypeView,
+  CreateRelationshipTypeParams,
+  UpdateRelationshipTypeParams,
+  DeprecateRelationshipTypeParams,
+  ObjectRelationshipEdge,
+  CreateRelationshipParams,
+  RelationshipView,
+  EndRelationshipParams,
+  DocumentObjectLinkRole,
+  DocumentObjectLinkView,
+  LinkDocumentParams,
+  UnlinkDocumentResult,
+  // Search
+  SearchSubjectType,
+  SearchParams,
+  SearchResultItem,
+  SearchAccountPage,
+  // Workflow definitions
+  WorkflowDefinitionStatus,
+  WorkflowDefinitionSpec,
+  WorkflowDefinitionView,
+  WorkflowDefinitionDetailView,
+  WorkflowDefinitionVersionSummary,
+  WorkflowDefinitionVersionDetail,
+  ListWorkflowDefinitionsParams,
+  // Fillable AcroForm templates
+  UploadableFile,
+  FormTemplateVersionSummary,
+  FormTemplateSummary,
+  JsonSchemaNode,
+  FormTemplateDetail,
+  CreateFormTemplateParams,
+  FormTemplateUploadResult,
+  FillFormTemplateParams,
+  FillResultView,
+  // Document intake / upload
+  IntakeResultView,
+  IntakeDocumentParams,
+  UploadSessionStatus,
+  UploadSessionView,
+  CreateUploadSessionParams,
+  BulkUploadFileParams,
+  CreateUploadSessionBatchParams,
+  CaptureBatchView,
+  CreateUploadSessionBatchFileResult,
+  CreateUploadSessionBatchResult,
+  IntakeFinalizeResult,
+  ArchiveMemberResultView,
+  IntakeArchiveResultView,
+  // Error registry
+  ErrorCatalogEntry,
+  ErrorCatalogResponse,
+  // Domain events
+  ListEventsParams,
+  DomainEventView,
+  DomainEventPage,
 } from "./types";

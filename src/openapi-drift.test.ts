@@ -14,6 +14,14 @@ import { test } from "node:test";
 // Scope note: NestJS emits request bodies + parameters into the spec, but the controllers don't declare
 // typed `@ApiResponse`s, so response schemas are absent from the spec. Response shapes are therefore
 // covered by the hand-written types plus the mocked unit tests in sdk.test.ts, not by this guard.
+//
+// KNOWN GAP (2026-08-17): the committed snapshot predates several already-shipped routes/fields that
+// the SDK now covers (object model, search, form-templates, document trust/diff, workflow-definitions,
+// the error registry, the intake sessions batch endpoint, and `classification` on CreateUploadSessionDto).
+// They are intentionally left OUT of EXPECTED_ENDPOINTS / EXPECTED_SCHEMA_PROPS below rather than
+// hand-authored into the fixture, so this guard only asserts what a real `sync:openapi` run has verified.
+// Run `pnpm --filter @pageweaver/sdk sync:openapi` against a live API before the next release to fold
+// them in and extend the guard to match.
 
 interface OpenApiSpec {
   paths: Record<string, Record<string, unknown>>;
@@ -41,12 +49,12 @@ const EXPECTED_ENDPOINTS: string[] = [
   "get /v1/templates/{id}/versions",
   "get /v1/templates/{id}/versions/{version}",
   "get /v1/templates/{id}/versions/{version}/attest",
-  // Living documents (F04). The public /d/:alias resolver is ApiExcludeController (not in the spec).
-  "post /v1/living-documents",
-  "get /v1/living-documents",
-  "get /v1/living-documents/{id}",
-  "post /v1/living-documents/{id}/versions",
-  "get /v1/living-documents/{id}/versions/{seq}",
+  // Document lineage: supersedes the retired /v1/living-documents/* surface (ODP-016/D187-189).
+  // The public /d/:alias resolver is ApiExcludeController (not in the spec).
+  "post /v1/documents/{id}/versions",
+  "get /v1/documents/{id}/versions",
+  "get /v1/documents/{id}/versions/{seq}",
+  "get /v1/documents/{id}/representations",
   "get /v1/schemas",
   "get /v1/schemas/{id}",
   "get /v1/schemas/{id}/versions",
@@ -106,6 +114,46 @@ const EXPECTED_ENDPOINTS: string[] = [
   "post /v1/forms/{id}/validate",
   "post /v1/forms/{id}/submissions",
   "get /v1/submissions/{id}",
+  // Object types (typed business-record definitions).
+  "get /v1/object-types",
+  "post /v1/object-types",
+  "get /v1/object-types/{id}",
+  "patch /v1/object-types/{id}",
+  "get /v1/object-types/{id}/versions",
+  "get /v1/object-types/{id}/versions/{version}",
+  "post /v1/object-types/{id}/publish",
+  "post /v1/object-types/{id}/deprecate",
+  // Objects (typed business records).
+  "get /v1/objects",
+  "post /v1/objects",
+  "get /v1/objects/{id}",
+  "put /v1/objects/{id}",
+  "get /v1/objects/{id}/versions",
+  "post /v1/objects/{id}/archive",
+  "post /v1/objects/{id}/restore",
+  "get /v1/objects/{id}/relationships",
+  "post /v1/objects/{id}/relationships",
+  "post /v1/objects/{id}/relationships/{relationshipId}/end",
+  "get /v1/objects/{id}/documents",
+  "post /v1/objects/{id}/documents",
+  "delete /v1/objects/{id}/documents/{documentId}",
+  // Relationship types.
+  "get /v1/relationship-types",
+  "post /v1/relationship-types",
+  "get /v1/relationship-types/{id}",
+  "patch /v1/relationship-types/{id}",
+  "post /v1/relationship-types/{id}/deprecate",
+  // Search.
+  "get /v1/search",
+  // Domain events.
+  "get /v1/events",
+  // Document intake / upload.
+  "post /v1/documents/intake",
+  "post /v1/documents/intake/sessions",
+  "get /v1/documents/intake/sessions/{id}",
+  "delete /v1/documents/intake/sessions/{id}",
+  "put /v1/documents/intake/sessions/{id}/chunks/{index}",
+  "post /v1/documents/intake/sessions/{id}/finalize",
 ];
 
 /**
@@ -128,8 +176,12 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "environment",
     "idempotencyKey",
     "callbackUrl",
+    "publicAlias",
+    "name",
     "options",
   ],
+  // Append a new version to a document's lineage — supersedes the retired living-documents reissue.
+  AppendDocumentVersionDto: ["payload"],
   ValidateDocumentDto: [
     "templateId",
     "payload",
@@ -159,6 +211,9 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
     "pdfUa",
     // How a non-conformant accessible document is handled. DocumentOutput.conformance.
     "conformance",
+    // NOTE: the spec's OutputDto also carries a `profile` field not yet modeled on DocumentOutput —
+    // pre-existing drift (present before this SDK update), tracked separately from the changes here.
+    "profile",
   ],
   RenderOptionsDto: [
     "page",
@@ -318,6 +373,82 @@ const EXPECTED_SCHEMA_PROPS: Record<string, string[]> = {
   // Smart Forms request DTOs (Phase D, V2-D06). Both carry just the field `data`.
   ValidateFormDto: ["data"],
   CreateSubmissionDto: ["data"],
+  // Object types (typed business-record definitions).
+  CreateObjectTypeDto: [
+    "key",
+    "nameSingular",
+    "namePlural",
+    "description",
+    "schema",
+    "uiSchema",
+    "policyOverlay",
+    "lifecycle",
+    "search",
+    "accessPolicy",
+  ],
+  UpdateObjectTypeDto: [
+    "nameSingular",
+    "namePlural",
+    "description",
+    "schema",
+    "uiSchema",
+    "policyOverlay",
+    "lifecycle",
+    "search",
+    "accessPolicy",
+  ],
+  PublishObjectTypeDto: ["note"],
+  DeprecateObjectTypeDto: ["reason"],
+  // Objects (typed business records).
+  CreateObjectDto: [
+    "objectTypeKey",
+    "objectTypeId",
+    "data",
+    "number",
+    "lifecycleState",
+    "ownerUserId",
+    "classification",
+    "changeReason",
+    "source",
+    "idempotencyKey",
+  ],
+  UpdateObjectDto: [
+    "data",
+    "expectedVersion",
+    "lifecycleState",
+    "ownerUserId",
+    "classification",
+    "changeReason",
+    "source",
+  ],
+  ArchiveObjectDto: ["reason"],
+  CreateRelationshipDto: ["relationshipTypeKey", "relationshipTypeId", "targetObjectId", "metadata"],
+  EndRelationshipDto: ["reason"],
+  LinkDocumentDto: ["documentId", "role"],
+  // Relationship types.
+  CreateRelationshipTypeDto: [
+    "key",
+    "label",
+    "inverseLabel",
+    "description",
+    "sourceTypeKeys",
+    "targetTypeKeys",
+    "cardinality",
+    "metadataSchema",
+  ],
+  UpdateRelationshipTypeDto: [
+    "label",
+    "inverseLabel",
+    "description",
+    "sourceTypeKeys",
+    "targetTypeKeys",
+    "cardinality",
+    "metadataSchema",
+  ],
+  DeprecateRelationshipTypeDto: ["reason"],
+  // Document intake / upload. NOTE: the live DTO has also grown a `classification` field (D223) not
+  // yet in this fixture — see the KNOWN GAP note above. Re-sync before extending this entry.
+  CreateUploadSessionDto: ["filename", "mediaType", "totalBytes", "chunkSize", "objectId", "objectRole"],
 };
 
 test("openapi drift: the SDK covers exactly the public endpoint set", () => {
