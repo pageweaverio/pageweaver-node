@@ -1,6 +1,6 @@
 {
   "name": "@pageweaver/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Official TypeScript SDK for the PageWeaver PDF generation API.",
   "license": "MIT",
   "author": "PageWeaver",
